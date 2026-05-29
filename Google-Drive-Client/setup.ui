@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>setup</class>
+ <widget class="QWidget" name="setup">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>493</width>
+    <height>345</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Setup</string>
+  </property>
+   <widget class="QPushButton" name="signin_button">
+    <property name="geometry">
+     <rect>
+      <x>150</x>
+      <y>60</y>
+      <width>81</width>
+      <height>25</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Sign in</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="finish_setup_button">
+    <property name="geometry">
+     <rect>
+      <x>130</x>
+      <y>160</y>
+      <width>131</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Finish Setup</string>
+    </property>
+   </widget>
+  </widget>
+ <resources/>
+ <connections/>
+</ui>
