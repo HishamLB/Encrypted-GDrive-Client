@@ -13,7 +13,13 @@ qt_add_executable(Google-Drive-Client
     mainwindow.ui
     setup.h setup.cpp setup.ui
     env.h env.cpp
+    global.h
+    global.cpp
+    driveitem.h driveitem.cpp
 )
+
+target_compile_definitions(Google-Drive-Client PRIVATE
+    PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 target_link_libraries(Google-Drive-Client
     PRIVATE

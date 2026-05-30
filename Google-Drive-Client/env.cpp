@@ -1,12 +1,14 @@
 #include "env.h"
 #include <fstream>
 #include <unordered_map>
-#include <cstdlib>
+#include <QDir>
 
 static std::unordered_map<std::string, std::string> loadEnv()
 {
+    // i hate cmake i hate cmake i hate cmake i hate cmake
     std::unordered_map<std::string, std::string> map;
-    std::ifstream file(".env");
+    QDir dir(PROJECT_SOURCE_DIR);
+    std::ifstream file(dir.absoluteFilePath(".env").toStdString());
     if (!file.is_open())
         return map;
     std::string line;

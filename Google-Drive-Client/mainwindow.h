@@ -2,6 +2,11 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QHttpMultiPart>
+#include <QLabel>
+#include "driveitem.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -19,7 +24,12 @@ public:
 
 private:
     Ui::MainWindow *ui;
+    QNetworkAccessManager *networkManager;
+    QNetworkReply* apiCall(const QUrl &url);
+    QNetworkReply* apiCall(const QUrl &url, QHttpMultiPart *multiPart);
     void upload();
+    std::vector<driveItem> driveItems;
+    void getAllFiles();
     void showSetupPage();
     void showMainPage();
 };

@@ -1,6 +1,30 @@
 #include "setup.h"
 #include "ui_setup.h"
 #include "env.h"
+#include "global.h"
+
+#include <QFile>
+#include <QJsonObject>
+#include <QJsonDocument>
+#include <QDir>
+
+static QString tokenPath()
+{
+    return QDir(PROJECT_SOURCE_DIR).absoluteFilePath("token.json");
+}
+
+static void saveToken()
+{
+    if (!oauth)
+        return;
+    QJsonObject obj;
+    obj["access_token"] = oauth->token();
+    obj["refresh_token"] = oauth->refreshToken();
+
+    QFile file(tokenPath());
+    if (file.open(QIODevice::WriteOnly))
+        file.write(QJsonDocument(obj).toJson());
+}
 
 setup::setup(QWidget *parent)
     : QWidget(parent)
@@ -13,20 +37,22 @@ setup::setup(QWidget *parent)
 
 void setup::googlesignin()
 {
-    auto oauth =
-        new QOAuth2AuthorizationCodeFlow(this);
+    if (oauth) {
+        delete oauth;
+        oauth = nullptr;
+    }
+    oauth = new QOAuth2AuthorizationCodeFlow(this);
 
     oauth->setAuthorizationUrl(
         QUrl("https://accounts.google.com/o/oauth2/v2/auth"));
 
-    oauth->setAccessTokenUrl(
+    oauth->setTokenUrl(
         QUrl("https://oauth2.googleapis.com/token"));
 
     oauth->setClientIdentifier(QString::fromStdString(getEnv("CLIENT_ID")));
     oauth->setClientIdentifierSharedKey(QString::fromStdString(getEnv("CLIENT_SECRET")));
 
-    oauth->setScope(
-        "https://www.googleapis.com/auth/drive.file");
+    oauth->setRequestedScopeTokens({"https://www.googleapis.com/auth/drive.file"});
 
     auto replyHandler =
         new QOAuthHttpServerReplyHandler(
@@ -44,6 +70,7 @@ void setup::googlesignin()
             this,
             [=]() {
                 qDebug() << "TOKEN:" << oauth->token();
+                saveToken();
             });
 
     oauth->grant();

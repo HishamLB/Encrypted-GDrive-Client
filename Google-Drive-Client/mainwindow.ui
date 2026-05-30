@@ -66,6 +66,17 @@
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="gridLayoutWidget">
+      <property name="geometry">
+       <rect>
+        <x>90</x>
+        <y>140</y>
+        <width>541</width>
+        <height>311</height>
+       </rect>
+      </property>
+      <layout class="QGridLayout" name="items"/>
+     </widget>
     </widget>
    </widget>
   </widget>
