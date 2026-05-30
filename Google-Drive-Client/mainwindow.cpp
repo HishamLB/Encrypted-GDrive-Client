@@ -6,9 +6,11 @@
 
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QIcon>
 #include <QFile>
 #include <QDir>
 #include <QLabel>
+#include <QVBoxLayout>
 #include <QGridLayout>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -127,14 +129,87 @@ void MainWindow::getAllFiles()
             item.name = obj["name"].toString();
             driveItems.push_back(item);
 
-            auto *label = new QLabel(item.name, ui->gridLayoutWidget);
-            label->setFrameStyle(QFrame::Box);
-            label->setAlignment(Qt::AlignCenter);
-            label->setMinimumSize(150, 80);
-            grid->addWidget(label, i / cols, i % cols);
+            auto *cell = new QWidget(ui->gridLayoutWidget);
+            auto *vl = new QVBoxLayout(cell);
+            auto *nameLabel = new QLabel(item.name, cell);
+            nameLabel->setAlignment(Qt::AlignCenter);
+            vl->addWidget(nameLabel);
+
+            auto *btnRow = new QHBoxLayout;
+            auto *dlBtn = new QPushButton(cell);
+            dlBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath("download.png")));
+            auto *delBtn = new QPushButton(cell);
+            delBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath("trash.png")));
+            connect(dlBtn, &QPushButton::clicked, this, [this, item]() {
+                download(item.fileId, item.name);
+            });
+            connect(delBtn, &QPushButton::clicked, this, [this, item]() {
+                qDebug() << "Delete:" << item.name << item.fileId;
+            });
+            btnRow->addStretch();
+            btnRow->addWidget(dlBtn);
+            btnRow->addWidget(delBtn);
+            vl->addLayout(btnRow);
+
+            cell->setStyleSheet("border: 1px solid gray;");
+            cell->setMinimumSize(160, 100);
+            grid->addWidget(cell, i / cols, i % cols);
         }
         reply->deleteLater();
     });
+}
+
+void MainWindow::download(QString fileId, QString name){
+    // @param {string} fileId (ID to download)
+    // @return {Blob} file content as a Blob.
+
+    // set download location first for convenience:
+
+    QString savePath =
+        QFileDialog::getSaveFileName(
+        this,
+        "Save File",
+        name);
+
+    if (savePath.isEmpty())
+        return;
+
+
+    // construct
+    QUrl url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media";
+
+    // send
+    QNetworkReply *reply = apiCall(url);
+
+
+    connect(reply, &QNetworkReply::finished,
+            this,
+            [reply, savePath]()
+            {
+        if (reply->error() != QNetworkReply::NoError)
+        {
+            qDebug() << reply->errorString();
+            reply->deleteLater();
+            return;
+        }
+
+        QFile out(savePath);
+
+        if (!out.open(QIODevice::WriteOnly))
+        {
+            qDebug() << "Failed to open output file";
+            reply->deleteLater();
+            return;
+        }
+
+        out.write(reply->readAll());
+        out.close();
+
+        qDebug() << "Download complete";
+
+        reply->deleteLater();
+    });
+
 }
 
 void MainWindow::upload()

@@ -25,6 +25,7 @@ public:
 private:
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
+    void download(QString, QString);
     QNetworkReply* apiCall(const QUrl &url);
     QNetworkReply* apiCall(const QUrl &url, QHttpMultiPart *multiPart);
     void upload();
