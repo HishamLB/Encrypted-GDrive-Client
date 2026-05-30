@@ -26,9 +26,13 @@ private:
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     void download(QString, QString);
+    void deleteFile(QString);
+    QNetworkReply* apiDelete(const QUrl);
     QNetworkReply* apiCall(const QUrl &url);
     QNetworkReply* apiCall(const QUrl &url, QHttpMultiPart *multiPart);
+    void uploadFile(const QString &filePath);
     void upload();
+    void uploadFolder();
     std::vector<driveItem> driveItems;
     void getAllFiles();
     void showSetupPage();

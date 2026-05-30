@@ -6,12 +6,16 @@
 
 #include <QFileDialog>
 #include <QFileInfo>
+#include <QDirIterator>
+#include <QPushButton>
 #include <QIcon>
 #include <QFile>
 #include <QDir>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QGridLayout>
+#include <QScrollArea>
+#include <QMessageBox>
 #include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QHttpMultiPart>
@@ -66,7 +70,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->setup_button, &QPushButton::clicked, this, &MainWindow::showSetupPage);
     connect(ui->upload_button, &QPushButton::clicked, this, &MainWindow::upload);
+
+    auto *folderBtn = new QPushButton("Upload Folder", ui->page_main);
+    ui->horizontalLayout->insertWidget(1, folderBtn);
+    connect(folderBtn, &QPushButton::clicked, this, &MainWindow::uploadFolder);
     connect(setupPage, &setup::finished, this, &MainWindow::showMainPage);
+
+    auto *scrollArea = new QScrollArea(ui->page_main);
+    scrollArea->setGeometry(90, 90, 651, 460);
+    scrollArea->setWidget(ui->gridLayoutWidget);
+    scrollArea->setWidgetResizable(true);
 
     auto *indicator = new QLabel(this);
     indicator->setFixedSize(16, 16);
@@ -144,7 +157,7 @@ void MainWindow::getAllFiles()
                 download(item.fileId, item.name);
             });
             connect(delBtn, &QPushButton::clicked, this, [this, item]() {
-                qDebug() << "Delete:" << item.name << item.fileId;
+                deleteFile(item.fileId);
             });
             btnRow->addStretch();
             btnRow->addWidget(dlBtn);
@@ -157,6 +170,47 @@ void MainWindow::getAllFiles()
         }
         reply->deleteLater();
     });
+}
+
+void MainWindow::deleteFile(const QString fileId)
+{
+    auto result = QMessageBox::question(this, "Delete File",
+        "Are you sure you want to delete this file?",
+        QMessageBox::Yes | QMessageBox::No);
+
+    if (result != QMessageBox::Yes)
+        return;
+
+    QUrl url(
+        QString("https://www.googleapis.com/drive/v3/files/%1")
+            .arg(fileId));
+
+    QNetworkReply *reply = apiDelete(url);
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+
+        if (reply->error() == QNetworkReply::NoError) {
+            QMessageBox::information(this, "Success", "File deleted.");
+            getAllFiles();
+        }
+        else {
+            QMessageBox::warning(this, "Error",
+                QString("Delete failed: %1").arg(reply->errorString()));
+        }
+
+        reply->deleteLater();
+    });
+}
+
+QNetworkReply* MainWindow::apiDelete(const QUrl url)
+{
+    QNetworkRequest request(url);
+
+    request.setRawHeader(
+        "Authorization",
+        QString("Bearer %1").arg(oauth->token()).toUtf8());
+
+    return networkManager->deleteResource(request);
 }
 
 void MainWindow::download(QString fileId, QString name){
@@ -212,41 +266,27 @@ void MainWindow::download(QString fileId, QString name){
 
 }
 
-void MainWindow::upload()
+void MainWindow::uploadFile(const QString &filePath)
 {
-    QString filePath =
-        QFileDialog::getOpenFileName(this, "Select file to upload");
-
-    if (filePath.isEmpty())
-        return;
-
     QFile *file = new QFile(filePath);
-
-    if (!file->open(QIODevice::ReadOnly))
-    {
+    if (!file->open(QIODevice::ReadOnly)) {
         delete file;
         return;
     }
 
     QFileInfo info(filePath);
 
-    QHttpMultiPart *multiPart =
-        new QHttpMultiPart(QHttpMultiPart::RelatedType);
+    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::RelatedType);
 
     QJsonObject metadata;
     metadata["name"] = info.fileName();
 
     QHttpPart metaPart;
-    metaPart.setHeader(
-        QNetworkRequest::ContentTypeHeader,
-        "application/json; charset=UTF-8");
-    metaPart.setBody(
-        QJsonDocument(metadata).toJson(QJsonDocument::Compact));
+    metaPart.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=UTF-8");
+    metaPart.setBody(QJsonDocument(metadata).toJson(QJsonDocument::Compact));
 
     QHttpPart filePart;
-    filePart.setHeader(
-        QNetworkRequest::ContentTypeHeader,
-        "application/octet-stream");
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
     filePart.setBodyDevice(file);
     file->setParent(multiPart);
 
@@ -257,20 +297,39 @@ void MainWindow::upload()
         QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
         multiPart);
 
-    connect(reply, &QNetworkReply::finished, this, [reply]() {
-        if (reply->error() == QNetworkReply::NoError)
-        {
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Upload success:";
             qDebug().noquote() << reply->readAll();
-        }
-        else
-        {
+            getAllFiles();
+        } else {
             qDebug() << "Upload failed:" << reply->errorString();
             qDebug().noquote() << reply->readAll();
         }
-
         reply->deleteLater();
     });
+}
+
+void MainWindow::upload()
+{
+    QFileDialog dialog(this);
+    dialog.setFileMode(QFileDialog::ExistingFiles);
+    if (!dialog.exec())
+        return;
+
+    for (const QString &file : dialog.selectedFiles())
+        uploadFile(file);
+}
+
+void MainWindow::uploadFolder()
+{
+    QString folder = QFileDialog::getExistingDirectory(this, "Select Folder");
+    if (folder.isEmpty())
+        return;
+
+    QDirIterator it(folder, QDir::Files, QDirIterator::Subdirectories);
+    while (it.hasNext())
+        uploadFile(it.next());
 }
 
 void MainWindow::showSetupPage()
