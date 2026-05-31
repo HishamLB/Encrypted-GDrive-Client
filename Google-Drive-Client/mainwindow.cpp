@@ -23,10 +23,19 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QAESEncryption>
+#include <quazip.h>
+#include <quazipfile.h>
+
 
 static QString tokenPath()
 {
     return QDir(PROJECT_SOURCE_DIR).absoluteFilePath("token.json");
+}
+
+static QString aesPath()
+{
+    return QDir(PROJECT_SOURCE_DIR).absoluteFilePath("aes.key");
 }
 
 static bool restoreToken()
@@ -56,6 +65,7 @@ static bool restoreToken()
     }
 
     return true;
+
 }
 
 MainWindow::MainWindow(QWidget *parent)
@@ -93,6 +103,12 @@ MainWindow::MainWindow(QWidget *parent)
         indicator->setStyleSheet("background-color: #ff0000; border-radius: 8px;");
         indicator->setToolTip("Not authenticated");
     }
+
+    // open file for aes key
+    QFile encFile(aesPath());
+    if (encFile.open(QIODevice::ReadOnly))
+        aes_key = encFile.readAll();
+
 }
 
 QNetworkReply* MainWindow::apiCall(const QUrl &url)
@@ -115,7 +131,7 @@ QNetworkReply* MainWindow::apiCall(const QUrl &url, QHttpMultiPart *multiPart)
 
 void MainWindow::getAllFiles()
 {
-    QNetworkReply *reply = apiCall(QUrl("https://www.googleapis.com/drive/v3/files"));
+    QNetworkReply *reply = apiCall(QUrl("https://www.googleapis.com/drive/v3/files?fields=files(id,name,mimeType,parents)"));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) {
             qDebug() << "List failed:" << reply->errorString();
@@ -140,8 +156,11 @@ void MainWindow::getAllFiles()
             driveItem item;
             item.fileId = obj["id"].toString();
             item.name = obj["name"].toString();
-            driveItems.push_back(item);
+            item.mimetype = obj["mimeType"].toString();
+            bool isFolder = (item.mimetype == "application/vnd.google-apps.folder");
 
+            driveItems.push_back(item);
+            if(isFolder) qDebug() << "aa";
             auto *cell = new QWidget(ui->gridLayoutWidget);
             auto *vl = new QVBoxLayout(cell);
             auto *nameLabel = new QLabel(item.name, cell);
@@ -268,44 +287,91 @@ void MainWindow::download(QString fileId, QString name){
 
 void MainWindow::uploadFile(const QString &filePath)
 {
-    QFile *file = new QFile(filePath);
-    if (!file->open(QIODevice::ReadOnly)) {
-        delete file;
+    QFile sourceFile(filePath);
+    if (!sourceFile.open(QIODevice::ReadOnly)) {
+        qDebug() << "Failed to open source file";
         return;
     }
 
     QFileInfo info(filePath);
 
-    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::RelatedType);
+    QString zipPath = QDir::temp().filePath(info.fileName() + ".zip");
+
+    QuaZip zip(zipPath);
+    if (!zip.open(QuaZip::mdCreate)) {
+        qDebug() << "Failed to create zip";
+        return;
+    }
+
+    QuaZipFile zipFile(&zip);
+    if (!zipFile.open(QIODevice::WriteOnly,
+                      QuaZipNewInfo(info.fileName(), info.fileName()))) {
+        qDebug() << "Failed to write zip entry";
+        zip.close();
+        return;
+    }
+
+    zipFile.write(sourceFile.readAll());
+    zipFile.close();
+    zip.close();
+    sourceFile.close();
+
+    // READ ZIP INTO MEMORY
+    QFile zipIn(zipPath);
+    if (!zipIn.open(QIODevice::ReadOnly)) {
+        qDebug() << "Failed to open zip";
+        return;
+    }
+
+    QByteArray plainData = zipIn.readAll();
+    zipIn.close();
+
+    // ENCRYPT DATA
+    QAESEncryption enc(QAESEncryption::AES_256,
+                       QAESEncryption::CBC,
+                       QAESEncryption::PKCS7);
+
+    QByteArray iv = "IDONTCAREIDONTCA"; // IV
+
+    QByteArray cipher = enc.encode(plainData, aes_key, iv);
+
+    // PREPARE MULTIPART UPLOAD
+    QHttpMultiPart *multiPart =
+        new QHttpMultiPart(QHttpMultiPart::RelatedType);
 
     QJsonObject metadata;
-    metadata["name"] = info.fileName();
+    metadata["name"] = info.fileName() + ".zip.enc";
 
     QHttpPart metaPart;
-    metaPart.setHeader(QNetworkRequest::ContentTypeHeader, "application/json; charset=UTF-8");
+    metaPart.setHeader(QNetworkRequest::ContentTypeHeader,
+                       "application/json; charset=UTF-8");
     metaPart.setBody(QJsonDocument(metadata).toJson(QJsonDocument::Compact));
 
     QHttpPart filePart;
-    filePart.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-    filePart.setBodyDevice(file);
-    file->setParent(multiPart);
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader,
+                       "application/octet-stream");
 
+    filePart.setBody(cipher);
     multiPart->append(metaPart);
     multiPart->append(filePart);
 
+    // SEND
     QNetworkReply *reply = apiCall(
         QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
         multiPart);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, zipPath]() {
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Upload success:";
             qDebug().noquote() << reply->readAll();
+
+            QFile::remove(zipPath);
             getAllFiles();
         } else {
             qDebug() << "Upload failed:" << reply->errorString();
             qDebug().noquote() << reply->readAll();
         }
+
         reply->deleteLater();
     });
 }
@@ -319,6 +385,7 @@ void MainWindow::upload()
 
     for (const QString &file : dialog.selectedFiles())
         uploadFile(file);
+    getAllFiles();
 }
 
 void MainWindow::uploadFolder()
@@ -328,10 +395,123 @@ void MainWindow::uploadFolder()
         return;
 
     QDirIterator it(folder, QDir::Files, QDirIterator::Subdirectories);
-    while (it.hasNext())
-        uploadFile(it.next());
+    uploadFolderAsZip(folder);
 }
 
+
+// clean this later im lazy
+void MainWindow::uploadFolderAsZip(const QString &folderPath)
+{
+    QFileInfo folderInfo(folderPath);
+    QString zipPath = QDir::temp().filePath(folderInfo.fileName() + ".zip");
+    QString encPath = zipPath + ".enc";
+
+    QuaZip zip(zipPath);
+    if (!zip.open(QuaZip::mdCreate)) {
+        qDebug() << "Failed to create zip";
+        return;
+    }
+
+    QDir dir(folderPath);
+    QDirIterator it(folderPath,
+                    QDir::Files | QDir::NoDotAndDotDot,    // what?
+                    QDirIterator::Subdirectories);
+
+    while (it.hasNext()) {
+        QString filePath = it.next();
+
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly))
+            continue;
+
+        QString relativePath = dir.relativeFilePath(filePath);
+
+        QuaZipFile zipFile(&zip);
+
+        QuaZipNewInfo info(relativePath, filePath);
+
+        if (!zipFile.open(QIODevice::WriteOnly, info)) {
+            qDebug() << "Failed to add file:" << filePath;
+            continue;
+        }
+
+        zipFile.write(file.readAll());
+        zipFile.close();
+        file.close();
+    }
+
+    zip.close();
+    QFile in(zipPath);
+    if (!in.open(QIODevice::ReadOnly)) {
+        qDebug() << "Cannot open zip";
+        return;
+    }
+
+    QByteArray zipData = in.readAll();
+    in.close();
+
+    QAESEncryption enc(QAESEncryption::AES_256,
+                       QAESEncryption::CBC,
+                       QAESEncryption::PKCS7);
+
+    QByteArray iv = "IDONTCAREIDONTCA"; // IV
+
+    QByteArray encrypted = enc.encode(zipData, aes_key, iv);
+
+    QFile out(encPath);
+    if (!out.open(QIODevice::WriteOnly)) {
+        qDebug() << "Cannot write encrypted file";
+        return;
+    }
+
+    out.write(encrypted);
+    out.close();
+
+    // upload zip
+    QFile *zipFile = new QFile(encPath);
+    if (!zipFile->open(QIODevice::ReadOnly)) {
+        delete zipFile;
+        return;
+    }
+
+    QJsonObject metadata;
+    metadata["name"] = folderInfo.fileName() + ".zip";
+
+    QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::RelatedType);
+
+    QHttpPart metaPart;
+    metaPart.setHeader(QNetworkRequest::ContentTypeHeader,
+                       "application/json; charset=UTF-8");
+    metaPart.setBody(QJsonDocument(metadata).toJson(QJsonDocument::Compact));
+
+    QHttpPart filePart;
+    filePart.setHeader(QNetworkRequest::ContentTypeHeader,
+                       "application/zip");
+    filePart.setBodyDevice(zipFile);
+
+    zipFile->setParent(multiPart);
+
+    multiPart->append(metaPart);
+    multiPart->append(filePart);
+
+    QNetworkReply *reply = apiCall(
+        QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
+        multiPart
+    );
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, encPath]() {
+        if (reply->error() == QNetworkReply::NoError) {
+            qDebug() << "Folder upload success";
+            QFile::remove(encPath);
+            getAllFiles();
+        } else {
+            qDebug() << "Upload failed:" << reply->errorString();
+            qDebug().noquote() << reply->readAll();
+        }
+
+        reply->deleteLater();
+    });
+}
 void MainWindow::showSetupPage()
 {
     ui->stackedWidget->setCurrentIndex(1);
@@ -340,6 +520,7 @@ void MainWindow::showSetupPage()
 void MainWindow::showMainPage()
 {
     ui->stackedWidget->setCurrentIndex(0);
+    getAllFiles();
 }
 
 MainWindow::~MainWindow()

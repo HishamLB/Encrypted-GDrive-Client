@@ -4,6 +4,7 @@
 
 
 extern QOAuth2AuthorizationCodeFlow* oauth;
+extern QByteArray aes_key;
 
 
 #endif // GLOBAL_H

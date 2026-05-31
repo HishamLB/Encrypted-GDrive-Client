@@ -29,6 +29,7 @@ private:
     void deleteFile(QString);
     QNetworkReply* apiDelete(const QUrl);
     QNetworkReply* apiCall(const QUrl &url);
+    void uploadFolderAsZip(const QString &folderPath);
     QNetworkReply* apiCall(const QUrl &url, QHttpMultiPart *multiPart);
     void uploadFile(const QString &filePath);
     void upload();

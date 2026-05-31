@@ -8,6 +8,7 @@ public:
     driveItem();
     QString fileId;
     QString name;
+    QString mimetype; // for folder heirarchy
 };
 
 #endif // DRIVEITEM_H
