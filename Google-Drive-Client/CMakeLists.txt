@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
 project(Google-Drive-Client LANGUAGES CXX)
-
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Widgets Network NetworkAuth)
 find_package(QtAES REQUIRED)
 find_package(QuaZip-Qt6 REQUIRED)
