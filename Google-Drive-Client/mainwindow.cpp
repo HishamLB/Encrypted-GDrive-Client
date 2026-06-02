@@ -26,7 +26,7 @@
 #include <QAESEncryption>
 #include <quazip.h>
 #include <quazipfile.h>
-
+#include <qtimer.h>
 
 static QString tokenPath()
 {
@@ -91,14 +91,19 @@ MainWindow::MainWindow(QWidget *parent)
     scrollArea->setWidget(ui->gridLayoutWidget);
     scrollArea->setWidgetResizable(true);
 
+    bool authed = restoreToken();
+
     auto *indicator = new QLabel(this);
     indicator->setFixedSize(16, 16);
     indicator->move(10, 10);
-    bool authed = restoreToken() || (oauth && oauth->status() == QAbstractOAuth::Status::Granted);
+    // doesn't work for some reason: Green when not authed/token not refreshed successfully
+  
     if (authed) {
         indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
         indicator->setToolTip("Authenticated");
-        getAllFiles();
+        QTimer::singleShot(300, this, [this]() {
+                getAllFiles();
+                });
     } else {
         indicator->setStyleSheet("background-color: #ff0000; border-radius: 8px;");
         indicator->setToolTip("Not authenticated");
