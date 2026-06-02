@@ -23,13 +23,17 @@ public:
     ~MainWindow();
 
 private:
+    QLabel* indicator;
+    bool authed;
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     void download(QString, QString);
+    void refreshIndicator();
     void deleteFile(QString);
     QNetworkReply* apiDelete(const QUrl);
     QNetworkReply* apiCall(const QUrl &url);
     void uploadFolderAsZip(const QString &folderPath);
+
     QNetworkReply* apiCall(const QUrl &url, QHttpMultiPart *multiPart);
     void uploadFile(const QString &filePath);
     void showSettingsPage();

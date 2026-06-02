@@ -70,6 +70,19 @@ static bool restoreToken()
 
 }
 
+void MainWindow::refreshIndicator(){
+if (authed) {
+        indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
+        indicator->setToolTip("Authenticated");
+        QTimer::singleShot(300, this, [this]() {
+                getAllFiles();
+                });
+    } else {
+        indicator->setStyleSheet("background-color: #ff0000; border-radius: 8px;");
+        indicator->setToolTip("Not authenticated");
+    }
+}
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -99,12 +112,14 @@ MainWindow::MainWindow(QWidget *parent)
     scrollArea->setWidget(ui->gridLayoutWidget);
     scrollArea->setWidgetResizable(true);
 
-    bool authed = restoreToken();
+    authed = restoreToken();
 
-    auto *indicator = new QLabel(this);
+    indicator = new QLabel(this);
     indicator->setFixedSize(16, 16);
     indicator->move(10, 10);
     // doesn't work for some reason: Green when not authed/token not refreshed successfully
+    
+    refreshIndicator();
 
     if (authed) {
         indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
@@ -540,6 +555,7 @@ void MainWindow::showSetupPage()
 
 void MainWindow::showMainPage()
 {
+    refreshIndicator();
     ui->stackedWidget->setCurrentIndex(0);
     getAllFiles();
 }
