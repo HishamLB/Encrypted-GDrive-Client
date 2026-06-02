@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/">
+        <file>download.png</file>
+        <file>trash.png</file>
+        <file>download_catpp.png</file>
+        <file>trash_catpp.png</file>
+    </qresource>
+</RCC>

@@ -13,6 +13,7 @@
 #include <QDir>
 #include <QLabel>
 #include <QVBoxLayout>
+#include <QCoreApplication>
 #include <QGridLayout>
 #include <QScrollArea>
 #include <QMessageBox>
@@ -31,12 +32,12 @@
 
 static QString tokenPath()
 {
-    return QDir(PROJECT_SOURCE_DIR).absoluteFilePath("token.json");
+    return QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("token.json");
 }
 
 static QString aesPath()
 {
-    return QDir(PROJECT_SOURCE_DIR).absoluteFilePath("aes.key");
+    return QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("aes.key");
 }
 
 static bool restoreToken()
@@ -188,10 +189,10 @@ void MainWindow::getAllFiles()
             auto *btnRow = new QHBoxLayout;
             auto *dlBtn = new QPushButton(cell);
             dlBtn->setObjectName("downloadBtn");
-            dlBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath(catppuccinTheme ? "download_catpp.png" : "download.png")));
+            dlBtn->setIcon(QIcon(catppuccinTheme ? ":/download_catpp.png" : ":/download.png"));
             auto *delBtn = new QPushButton(cell);
             delBtn->setObjectName("deleteBtn");
-            delBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath(catppuccinTheme ? "trash_catpp.png" : "trash.png")));
+            delBtn->setIcon(QIcon(catppuccinTheme ? ":/trash_catpp.png" : ":/trash.png"));
             connect(dlBtn, &QPushButton::clicked, this, [this, item]() {
                 download(item.fileId, item.name);
             });

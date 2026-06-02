@@ -2,7 +2,6 @@
 #include "ui_settings.h"
 #include "global.h"
 #include <QApplication>
-#include <QDir>
 #include <QIcon>
 
 static const char* defaultStylesheet = R"(
@@ -182,33 +181,32 @@ static const char* catppuccinStylesheet = R"(
     }
 )";
 
-static void swapIcons(const QString& dlFile, const QString& delFile) {
-    QDir dir(PROJECT_SOURCE_DIR);
-    QIcon dlIcon(dir.absoluteFilePath(dlFile));
-    QIcon delIcon(dir.absoluteFilePath(delFile));
-    for (auto* tlw : qApp->topLevelWidgets()) {
-        for (auto* btn : tlw->findChildren<QPushButton*>("downloadBtn"))
-            btn->setIcon(dlIcon);
-        for (auto* btn : tlw->findChildren<QPushButton*>("deleteBtn"))
-            btn->setIcon(delIcon);
-    }
-}
-
 settings::settings(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::settings)
 {
     ui->setupUi(this);
 
-    connect(ui->catppuccin_radio, &QRadioButton::clicked, this, [](){
+    auto setIcons = [](const char* dlRes, const char* delRes) {
+        QIcon dlIcon(dlRes);
+        QIcon delIcon(delRes);
+        for (auto* tlw : qApp->topLevelWidgets()) {
+            for (auto* btn : tlw->findChildren<QPushButton*>("downloadBtn"))
+                btn->setIcon(dlIcon);
+            for (auto* btn : tlw->findChildren<QPushButton*>("deleteBtn"))
+                btn->setIcon(delIcon);
+        }
+    };
+
+    connect(ui->catppuccin_radio, &QRadioButton::clicked, this, [setIcons](){
         catppuccinTheme = true;
         qApp->setStyleSheet(catppuccinStylesheet);
-        swapIcons("download_catpp.png", "trash_catpp.png");
+        setIcons(":/download_catpp.png", ":/trash_catpp.png");
     });
-    connect(ui->default_radio, &QRadioButton::clicked, this, [](){
+    connect(ui->default_radio, &QRadioButton::clicked, this, [setIcons](){
         catppuccinTheme = false;
         qApp->setStyleSheet(defaultStylesheet);
-        swapIcons("download.png", "trash.png");
+        setIcons(":/download.png", ":/trash.png");
     });
     connect(ui->back_button, &QPushButton::clicked, this, [this](){
         emit settingsFinished();

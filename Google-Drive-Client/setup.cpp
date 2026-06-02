@@ -7,10 +7,11 @@
 #include <QJsonObject>
 #include <QJsonDocument>
 #include <QDir>
+#include <QCoreApplication>
 
 static QString tokenPath()
 {
-    return QDir(PROJECT_SOURCE_DIR).absoluteFilePath("token.json");
+    return QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("token.json");
 }
 
 static void saveToken()

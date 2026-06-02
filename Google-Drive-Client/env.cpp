@@ -1,13 +1,13 @@
 #include "env.h"
 #include <fstream>
 #include <unordered_map>
+#include <QCoreApplication>
 #include <QDir>
 
 static std::unordered_map<std::string, std::string> loadEnv()
 {
-    // i hate cmake i hate cmake i hate cmake i hate cmake
     std::unordered_map<std::string, std::string> map;
-    QDir dir(PROJECT_SOURCE_DIR);
+    QDir dir(QCoreApplication::applicationDirPath());
     std::ifstream file(dir.absoluteFilePath(".env").toStdString());
     if (!file.is_open())
         return map;

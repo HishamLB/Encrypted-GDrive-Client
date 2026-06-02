@@ -21,8 +21,15 @@ qt_add_executable(Google-Drive-Client
     settings.h settings.cpp settings.ui
 )
 
-target_compile_definitions(Google-Drive-Client PRIVATE
-    PROJECT_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/resources.cpp
+    COMMAND Qt6::rcc --name resources --output ${CMAKE_CURRENT_BINARY_DIR}/resources.cpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/resources.qrc download.png trash.png
+            download_catpp.png trash_catpp.png
+    VERBATIM
+)
+target_sources(Google-Drive-Client PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/resources.cpp)
 
 target_link_libraries(Google-Drive-Client
     PRIVATE
