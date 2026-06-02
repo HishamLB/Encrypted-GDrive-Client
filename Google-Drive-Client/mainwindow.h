@@ -32,6 +32,7 @@ private:
     void uploadFolderAsZip(const QString &folderPath);
     QNetworkReply* apiCall(const QUrl &url, QHttpMultiPart *multiPart);
     void uploadFile(const QString &filePath);
+    void showSettingsPage();
     void upload();
     void uploadFolder();
     std::vector<driveItem> driveItems;

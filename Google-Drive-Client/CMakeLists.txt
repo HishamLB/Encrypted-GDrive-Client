@@ -18,6 +18,7 @@ qt_add_executable(Google-Drive-Client
     global.h
     global.cpp
     driveitem.h driveitem.cpp
+    settings.h settings.cpp settings.ui
 )
 
 target_compile_definitions(Google-Drive-Client PRIVATE

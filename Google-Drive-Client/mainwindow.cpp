@@ -27,6 +27,7 @@
 #include <quazip.h>
 #include <quazipfile.h>
 #include <qtimer.h>
+#include "settings.h"
 
 static QString tokenPath()
 {
@@ -74,18 +75,24 @@ MainWindow::MainWindow(QWidget *parent)
     , networkManager(new QNetworkAccessManager(this))
 {
     ui->setupUi(this);
+    qApp->setStyleSheet("* { font-family: \"JetBrains Mono\"; font-weight: bold; } QWidget#driveItemCell { border: 1px solid gray; }");
 
     auto *setupPage = new setup(this);
+    auto *settingsPage = new settings;
     ui->stackedWidget->addWidget(setupPage);
-
+    ui->stackedWidget->addWidget(settingsPage);
     connect(ui->setup_button, &QPushButton::clicked, this, &MainWindow::showSetupPage);
     connect(ui->upload_button, &QPushButton::clicked, this, &MainWindow::upload);
-
+    
     auto *folderBtn = new QPushButton("Upload Folder", ui->page_main);
     ui->horizontalLayout->insertWidget(1, folderBtn);
     connect(folderBtn, &QPushButton::clicked, this, &MainWindow::uploadFolder);
     connect(setupPage, &setup::finished, this, &MainWindow::showMainPage);
+    connect(settingsPage, &settings::settingsFinished, this, [this](){
+            ui->stackedWidget->setCurrentIndex(0);
+            });
 
+    connect(ui->settings_button, &QPushButton::clicked, this, &MainWindow::showSettingsPage);
     auto *scrollArea = new QScrollArea(ui->page_main);
     scrollArea->setGeometry(90, 90, 651, 460);
     scrollArea->setWidget(ui->gridLayoutWidget);
@@ -97,7 +104,7 @@ MainWindow::MainWindow(QWidget *parent)
     indicator->setFixedSize(16, 16);
     indicator->move(10, 10);
     // doesn't work for some reason: Green when not authed/token not refreshed successfully
-  
+
     if (authed) {
         indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
         indicator->setToolTip("Authenticated");
@@ -109,11 +116,17 @@ MainWindow::MainWindow(QWidget *parent)
         indicator->setToolTip("Not authenticated");
     }
 
+
+
     // open file for aes key
     QFile encFile(aesPath());
     if (encFile.open(QIODevice::ReadOnly))
         aes_key = encFile.readAll();
 
+}
+
+void MainWindow::showSettingsPage(){
+    ui->stackedWidget->setCurrentIndex(2);
 }
 
 QNetworkReply* MainWindow::apiCall(const QUrl &url)
@@ -174,9 +187,11 @@ void MainWindow::getAllFiles()
 
             auto *btnRow = new QHBoxLayout;
             auto *dlBtn = new QPushButton(cell);
-            dlBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath("download.png")));
+            dlBtn->setObjectName("downloadBtn");
+            dlBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath(catppuccinTheme ? "download_catpp.png" : "download.png")));
             auto *delBtn = new QPushButton(cell);
-            delBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath("trash.png")));
+            delBtn->setObjectName("deleteBtn");
+            delBtn->setIcon(QIcon(QDir(PROJECT_SOURCE_DIR).absoluteFilePath(catppuccinTheme ? "trash_catpp.png" : "trash.png")));
             connect(dlBtn, &QPushButton::clicked, this, [this, item]() {
                 download(item.fileId, item.name);
             });
@@ -188,7 +203,7 @@ void MainWindow::getAllFiles()
             btnRow->addWidget(delBtn);
             vl->addLayout(btnRow);
 
-            cell->setStyleSheet("border: 1px solid gray;");
+            cell->setObjectName("driveItemCell");
             cell->setMinimumSize(160, 100);
             grid->addWidget(cell, i / cols, i % cols);
         }
@@ -215,7 +230,7 @@ void MainWindow::deleteFile(const QString fileId)
 
         if (reply->error() == QNetworkReply::NoError) {
             QMessageBox::information(this, "Success", "File deleted.");
-            getAllFiles();
+            getAllFiles();          // we might get rate limited if Google cares
         }
         else {
             QMessageBox::warning(this, "Error",
