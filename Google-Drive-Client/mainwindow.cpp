@@ -91,6 +91,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
     qApp->setStyleSheet("* { font-family: \"JetBrains Mono\"; font-weight: bold; } QWidget#driveItemCell { border: 1px solid gray; }");
 
+    iv = "IDONTCAREIDONTCA"; // IV
     auto *setupPage = new setup(this);
     auto *settingsPage = new settings;
     ui->stackedWidget->addWidget(setupPage);
@@ -117,7 +118,6 @@ MainWindow::MainWindow(QWidget *parent)
     indicator = new QLabel(this);
     indicator->setFixedSize(16, 16);
     indicator->move(10, 10);
-    // doesn't work for some reason: Green when not authed/token not refreshed successfully
     
     refreshIndicator();
 
@@ -273,12 +273,19 @@ void MainWindow::download(QString fileId, QString name){
     // @return {Blob} file content as a Blob.
 
     // set download location first for convenience:
+    // decrypt on download
+
+    QString cleanName = name;
+    if (cleanName.endsWith(".zip.enc"))
+        cleanName.chop(8);
+    else if (cleanName.endsWith(".zip"))
+        cleanName.chop(4);
 
     QString savePath =
         QFileDialog::getSaveFileName(
         this,
         "Save File",
-        name);
+        cleanName);
 
     if (savePath.isEmpty())
         return;
@@ -290,31 +297,89 @@ void MainWindow::download(QString fileId, QString name){
     // send
     QNetworkReply *reply = apiCall(url);
 
-
     connect(reply, &QNetworkReply::finished,
             this,
-            [reply, savePath]()
+            [this, reply, savePath, name]()
             {
-        if (reply->error() != QNetworkReply::NoError)
-        {
+        if (reply->error() != QNetworkReply::NoError) {
             qDebug() << reply->errorString();
             reply->deleteLater();
             return;
         }
 
-        QFile out(savePath);
+        QByteArray encryptedFile = reply->readAll();
 
-        if (!out.open(QIODevice::WriteOnly))
-        {
-            qDebug() << "Failed to open output file";
+        QAESEncryption enc(QAESEncryption::AES_256,
+                           QAESEncryption::CBC,
+                           QAESEncryption::PKCS7);
+
+        QByteArray iv = "IDONTCAREIDONTCA";
+
+        QByteArray zipData = enc.decode(encryptedFile, aes_key, iv);
+        zipData = enc.removePadding(zipData);
+
+        // always zip
+        QString tempZip = savePath + ".zip";
+
+        QFile zipFile(tempZip);
+        if (!zipFile.open(QIODevice::WriteOnly)) {
+            qDebug() << "Failed writing zip";
             reply->deleteLater();
             return;
         }
 
-        out.write(reply->readAll());
-        out.close();
+        zipFile.write(zipData);
+        zipFile.close();
 
-        qDebug() << "Download complete";
+        QuaZip zip(tempZip);
+        if (!zip.open(QuaZip::mdUnzip)) {
+            qDebug() << "Failed opening zip";
+            QFile::remove(tempZip);
+            reply->deleteLater();
+            return;
+        }
+
+        // one file
+        bool isSingleFile = name.endsWith(".zip.enc");
+
+        if (isSingleFile) {
+            QDir().mkpath(QFileInfo(savePath).absolutePath());
+            for (bool more = zip.goToFirstFile(); more; more = zip.goToNextFile()) {
+                QuaZipFile in(&zip);
+                if (!in.open(QIODevice::ReadOnly))
+                    continue;
+                QFile out(savePath);
+                if (out.open(QIODevice::WriteOnly)) {
+                    out.write(in.readAll());
+                    out.close();
+                }
+                in.close();
+                break;
+            }
+        } else {            // folder
+            QString extractDir = savePath;
+            QDir().mkpath(extractDir);
+            for (bool more = zip.goToFirstFile(); more; more = zip.goToNextFile()) {
+                QuaZipFile in(&zip);
+                if (!in.open(QIODevice::ReadOnly))
+                    continue;
+                QuaZipFileInfo64 info;
+                zip.getCurrentFileInfo(&info);
+                QString outPath = extractDir + "/" + info.name;
+                QDir().mkpath(QFileInfo(outPath).absolutePath());
+                QFile out(outPath);
+                if (out.open(QIODevice::WriteOnly)) {
+                    out.write(in.readAll());
+                    out.close();
+                }
+                in.close();
+            }
+        }
+
+        zip.close();
+        QFile::remove(tempZip);
+
+        qDebug() << "Restore complete";
 
         reply->deleteLater();
     });
@@ -367,7 +432,6 @@ void MainWindow::uploadFile(const QString &filePath)
                        QAESEncryption::CBC,
                        QAESEncryption::PKCS7);
 
-    QByteArray iv = "IDONTCAREIDONTCA"; // IV
 
     QByteArray cipher = enc.encode(plainData, aes_key, iv);
 
@@ -490,7 +554,6 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
                        QAESEncryption::CBC,
                        QAESEncryption::PKCS7);
 
-    QByteArray iv = "IDONTCAREIDONTCA"; // IV
 
     QByteArray encrypted = enc.encode(zipData, aes_key, iv);
 
@@ -533,7 +596,7 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
     QNetworkReply *reply = apiCall(
         QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
         multiPart
-    );
+        );
 
     connect(reply, &QNetworkReply::finished, this, [this, reply, encPath]() {
         if (reply->error() == QNetworkReply::NoError) {

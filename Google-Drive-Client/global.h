@@ -5,6 +5,7 @@
 
 extern QOAuth2AuthorizationCodeFlow* oauth;
 extern QByteArray aes_key;
+extern QByteArray iv;
 extern bool catppuccinTheme;
 
 
