@@ -1,4 +1,5 @@
 #include "settings.h"
+#include <QButtonGroup>
 #include "ui_settings.h"
 #include "global.h"
 #include <QApplication>
@@ -11,6 +12,20 @@ static const char* defaultStylesheet = R"(
     }
     QWidget#driveItemCell {
         border: 1px solid gray;
+    }
+    QRadioButton {
+        spacing: 8px;
+    }
+    QRadioButton::indicator {
+        width: 18px;
+        height: 18px;
+        border: 2px solid palette(shadow);
+        border-radius: 10px;
+        background: palette(base);
+    }
+    QRadioButton::indicator:checked {
+        background: palette(highlight);
+        border: 2px solid palette(highlight);
     }
 )";
 
@@ -197,6 +212,12 @@ settings::settings(QWidget *parent)
                 btn->setIcon(delIcon);
         }
     };
+    QButtonGroup* group = new QButtonGroup(this);
+    group->addButton(ui->default_radio);
+    group->addButton(ui->catppuccin_radio);
+
+    ui->default_radio->setChecked(true);
+    qApp->setStyleSheet(defaultStylesheet);
 
     connect(ui->catppuccin_radio, &QRadioButton::clicked, this, [setIcons](){
         catppuccinTheme = true;
