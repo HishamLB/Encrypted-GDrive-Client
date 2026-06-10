@@ -70,6 +70,42 @@ static bool restoreToken()
 
 }
 
+void MainWindow::readConfig(){
+    QFile configFile(configPath());
+
+    if (!configFile.open(QIODevice::ReadOnly))
+        return;
+
+    QJsonObject obj = QJsonDocument::fromJson(configFile.readAll()).object();
+
+    qint32 theme = obj["theme"].toInt();
+
+    bool encryptFileNames = obj["encryptfilenames"].toBool();
+
+    catppuccinTheme = (theme == 1);
+    if (catppuccinTheme) {
+        qApp->setStyleSheet(catppuccinStylesheet);
+        QIcon dlIcon(":/download_catpp.png");
+        QIcon delIcon(":/trash_catpp.png");
+        for (auto* tlw : qApp->topLevelWidgets()) {
+            for (auto* btn : tlw->findChildren<QPushButton*>("downloadBtn"))
+                btn->setIcon(dlIcon);
+            for (auto* btn : tlw->findChildren<QPushButton*>("deleteBtn"))
+                btn->setIcon(delIcon);
+        }
+    } else {
+        qApp->setStyleSheet(defaultStylesheet);
+        QIcon dlIcon(":/download.png");
+        QIcon delIcon(":/trash.png");
+        for (auto* tlw : qApp->topLevelWidgets()) {
+            for (auto* btn : tlw->findChildren<QPushButton*>("downloadBtn"))
+                btn->setIcon(dlIcon);
+            for (auto* btn : tlw->findChildren<QPushButton*>("deleteBtn"))
+                btn->setIcon(delIcon);
+        }
+    }
+}
+
 void MainWindow::refreshIndicator(){
 if (authed) {
         indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
@@ -104,6 +140,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(folderBtn, &QPushButton::clicked, this, &MainWindow::uploadFolder);
     connect(setupPage, &setup::finished, this, &MainWindow::showMainPage);
     connect(settingsPage, &settings::settingsFinished, this, [this](){
+            readConfig();
             ui->stackedWidget->setCurrentIndex(0);
             });
 
@@ -139,6 +176,7 @@ MainWindow::MainWindow(QWidget *parent)
     if (encFile.open(QIODevice::ReadOnly))
         aes_key = encFile.readAll();
 
+    readConfig();
 }
 
 void MainWindow::showSettingsPage(){

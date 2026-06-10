@@ -18,8 +18,8 @@
     <rect>
      <x>90</x>
      <y>50</y>
-     <width>160</width>
-     <height>80</height>
+     <width>204</width>
+     <height>106</height>
     </rect>
    </property>
    <layout class="QFormLayout" name="formLayout">
@@ -41,6 +41,13 @@
      <widget class="QRadioButton" name="default_radio">
       <property name="text">
        <string>Default</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QCheckBox" name="encryptFileName">
+      <property name="text">
+       <string>Encrypt File Names*</string>
       </property>
      </widget>
     </item>

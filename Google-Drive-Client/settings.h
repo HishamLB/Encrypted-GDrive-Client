@@ -7,6 +7,9 @@ namespace Ui {
 class settings;
 }
 
+extern const char* defaultStylesheet;
+extern const char* catppuccinStylesheet;
+
 class settings : public QWidget
 {
     Q_OBJECT
@@ -20,6 +23,7 @@ public:
 
 private:
     Ui::settings *ui;
+    void writeToConfig();
 };
 
 #endif // SETTINGS_H

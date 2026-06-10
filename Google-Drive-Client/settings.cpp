@@ -4,8 +4,12 @@
 #include "global.h"
 #include <QApplication>
 #include <QIcon>
+#include <QDir>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
-static const char* defaultStylesheet = R"(
+const char* defaultStylesheet = R"(
     * {
         font-family: "JetBrains Mono";
         font-weight: bold;
@@ -29,7 +33,7 @@ static const char* defaultStylesheet = R"(
     }
 )";
 
-static const char* catppuccinStylesheet = R"(
+const char* catppuccinStylesheet = R"(
     * {
         font-family: "JetBrains Mono";
         font-weight: bold;
@@ -196,40 +200,34 @@ static const char* catppuccinStylesheet = R"(
     }
 )";
 
+void settings::writeToConfig(){
+
+    QFile configFile(configPath());
+    QJsonObject obj;
+    int theme = 1;
+    if(ui->default_radio->isChecked()){
+        theme = 0;
+    }
+    obj["theme"] = theme;
+    obj["encryptfilenames"] = ui->encryptFileName->isChecked();
+
+    // does write order matter?
+    if (configFile.open(QIODevice::WriteOnly))
+        configFile.write(QJsonDocument(obj).toJson());
+}
+
 settings::settings(QWidget *parent)
     : QWidget(parent)
     , ui(new Ui::settings)
 {
     ui->setupUi(this);
 
-    auto setIcons = [](const char* dlRes, const char* delRes) {
-        QIcon dlIcon(dlRes);
-        QIcon delIcon(delRes);
-        for (auto* tlw : qApp->topLevelWidgets()) {
-            for (auto* btn : tlw->findChildren<QPushButton*>("downloadBtn"))
-                btn->setIcon(dlIcon);
-            for (auto* btn : tlw->findChildren<QPushButton*>("deleteBtn"))
-                btn->setIcon(delIcon);
-        }
-    };
     QButtonGroup* group = new QButtonGroup(this);
     group->addButton(ui->default_radio);
     group->addButton(ui->catppuccin_radio);
 
-    ui->default_radio->setChecked(true);
-    qApp->setStyleSheet(defaultStylesheet);
-
-    connect(ui->catppuccin_radio, &QRadioButton::clicked, this, [setIcons](){
-        catppuccinTheme = true;
-        qApp->setStyleSheet(catppuccinStylesheet);
-        setIcons(":/download_catpp.png", ":/trash_catpp.png");
-    });
-    connect(ui->default_radio, &QRadioButton::clicked, this, [setIcons](){
-        catppuccinTheme = false;
-        qApp->setStyleSheet(defaultStylesheet);
-        setIcons(":/download.png", ":/trash.png");
-    });
     connect(ui->back_button, &QPushButton::clicked, this, [this](){
+        writeToConfig();
         emit settingsFinished();
     });
 }

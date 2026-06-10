@@ -24,6 +24,7 @@ public:
 
 private:
     QLabel* indicator;
+    void readConfig();
     bool authed;
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
