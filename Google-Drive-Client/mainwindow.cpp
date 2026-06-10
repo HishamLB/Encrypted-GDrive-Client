@@ -428,6 +428,17 @@ void MainWindow::download(QString fileId, QString name){
 
 }
 
+static QString encryptedFileName(const QString &name)
+{
+    if (!encryptFileNames)
+        return name;
+    QAESEncryption enc(QAESEncryption::AES_256,
+                       QAESEncryption::CBC,
+                       QAESEncryption::PKCS7);
+    QByteArray encName = enc.encode(name.toUtf8(), aes_key, iv);
+    return QString::fromLatin1(encName.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+}
+
 void MainWindow::uploadFile(const QString &filePath)
 {
     QFile sourceFile(filePath);
@@ -482,7 +493,7 @@ void MainWindow::uploadFile(const QString &filePath)
         new QHttpMultiPart(QHttpMultiPart::RelatedType);
 
     QJsonObject metadata;
-    metadata["name"] = info.fileName() + ".zip.enc";
+    metadata["name"] = encryptedFileName(info.fileName()) + ".zip.enc";
 
     QHttpPart metaPart;
     metaPart.setHeader(QNetworkRequest::ContentTypeHeader,
@@ -616,7 +627,7 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
     }
 
     QJsonObject metadata;
-    metadata["name"] = folderInfo.fileName() + ".zip";
+    metadata["name"] = encryptedFileName(folderInfo.fileName()) + ".zip";
 
     QHttpMultiPart *multiPart = new QHttpMultiPart(QHttpMultiPart::RelatedType);
 
