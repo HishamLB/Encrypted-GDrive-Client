@@ -73,6 +73,7 @@ static bool restoreToken()
 void MainWindow::readConfig(){
     QFile configFile(configPath());
 
+
     if (!configFile.open(QIODevice::ReadOnly))
         return;
 
@@ -80,7 +81,9 @@ void MainWindow::readConfig(){
 
     qint32 theme = obj["theme"].toInt();
 
-    bool encryptFileNames = obj["encryptfilenames"].toBool();
+    bool readEncryptFileNames = obj["encryptfilenames"].toBool();
+    encryptFileNames = readEncryptFileNames;
+
 
     catppuccinTheme = (theme == 1);
     if (catppuccinTheme) {
@@ -129,7 +132,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     iv = "IDONTCAREIDONTCA"; // IV
     auto *setupPage = new setup(this);
-    auto *settingsPage = new settings;
+    settingsPage = new settings;
     ui->stackedWidget->addWidget(setupPage);
     ui->stackedWidget->addWidget(settingsPage);
     connect(ui->setup_button, &QPushButton::clicked, this, &MainWindow::showSetupPage);
@@ -180,6 +183,7 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 void MainWindow::showSettingsPage(){
+    settingsPage->setEncryptFileNamesBox(encryptFileNames);
     ui->stackedWidget->setCurrentIndex(2);
 }
 

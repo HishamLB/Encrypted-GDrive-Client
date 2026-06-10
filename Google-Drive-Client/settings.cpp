@@ -226,12 +226,25 @@ settings::settings(QWidget *parent)
     group->addButton(ui->default_radio);
     group->addButton(ui->catppuccin_radio);
 
+    ui->encryptFileName->setChecked(encryptFileNames);       // horrible naming
     connect(ui->back_button, &QPushButton::clicked, this, [this](){
         writeToConfig();
         emit settingsFinished();
     });
+
+    connect(ui->encryptFileName, &QCheckBox::clicked, this, &settings::checkBoxEncryptedFileNames);
 }
 
+void settings::setEncryptFileNamesBox(bool state){
+    ui->encryptFileName->setChecked(state);
+}
+
+void settings::checkBoxEncryptedFileNames()
+{
+    bool isChecked = ui->encryptFileName->isChecked();
+    encryptFileNames = isChecked;
+
+}
 settings::~settings()
 {
     delete ui;

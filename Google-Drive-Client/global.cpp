@@ -5,3 +5,4 @@ QByteArray aes_key;
 bool catppuccinTheme = false;
 QByteArray iv;
 
+bool encryptFileNames;

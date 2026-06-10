@@ -8,6 +8,8 @@
 #include <QLabel>
 #include "driveitem.h"
 
+class settings;
+
 QT_BEGIN_NAMESPACE
 namespace Ui {
 class MainWindow;
@@ -26,6 +28,7 @@ private:
     QLabel* indicator;
     void readConfig();
     bool authed;
+    settings* settingsPage;
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     void download(QString, QString);

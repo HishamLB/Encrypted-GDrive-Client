@@ -20,10 +20,12 @@ signals:
 public:
     explicit settings(QWidget *parent = nullptr);
     ~settings();
+    void setEncryptFileNamesBox(bool);
 
 private:
     Ui::settings *ui;
     void writeToConfig();
+    void checkBoxEncryptedFileNames();
 };
 
 #endif // SETTINGS_H
