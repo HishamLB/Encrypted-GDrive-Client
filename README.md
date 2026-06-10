@@ -16,5 +16,5 @@
     - It already returns an error message if they try to delete same file twice so it's not destructive
 - [ ] Try and integrate with the local Gdrive client thing (this probably only exists on Windows)
 
-- [ ] Save configuration somewhere
+- [x] Save configuration somewhere
 
