@@ -20,7 +20,7 @@ jobs:
 
     - name: Build QtAES from source
       run: |
-        git clone https://github.com/OpenCryptoProject/QtAES.git /tmp/QtAES
+        git clone https://github.com/bricke/Qt-AES.git /tmp/QtAES
         cmake -S /tmp/QtAES -B /tmp/QtAES/build -DCMAKE_BUILD_TYPE=Release
         cmake --build /tmp/QtAES/build
         sudo cmake --install /tmp/QtAES/build
