@@ -49,9 +49,11 @@ install(TARGETS Google-Drive-Client
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-qt_generate_deploy_app_script(
-    TARGET Google-Drive-Client
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-)
-install(SCRIPT ${deploy_script})
+if(Qt6Core_VERSION VERSION_GREATER_EQUAL "6.5")
+    qt_generate_deploy_app_script(
+        TARGET Google-Drive-Client
+        OUTPUT_SCRIPT deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+    install(SCRIPT ${deploy_script})
+endif()
