@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QDirIterator>
 #include <QPushButton>
+#include <QProcess>
 #include <QIcon>
 #include <QFile>
 #include <QDir>
@@ -528,13 +529,38 @@ void MainWindow::uploadFile(const QString &filePath)
     timer.start();
 
     // ENCRYPT DATA
-    QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
+    //QAESEncryption enc(QAESEncryption::AES_256,
+      //                 QAESEncryption::CBC,
+        //               QAESEncryption::PKCS7);
 
 
-    QByteArray cipher = enc.encode(plainData, aes_key, iv);
+   // QByteArray cipher = enc.encode(plainData, aes_key, iv);
 
+    QProcess process;
+
+    QStringList args;
+    args << "enc"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+
+    if (!process.waitForStarted()) {
+        qDebug() << "Failed to start OpenSSL";
+        return;
+    }
+    process.write(plainData);
+    process.closeWriteChannel();
+    if (!process.waitForFinished()) {
+        qDebug() << "OpenSSL failed";
+        return;
+    }
+
+    QByteArray cipher = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+    if (!errorOutput.isEmpty()) {
+        qDebug() << "OpenSSL error:" << errorOutput;
+    }
 
     qDebug() << "Encryption done in " << timer.elapsed() << "ms";
 
