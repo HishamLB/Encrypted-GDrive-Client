@@ -12,7 +12,7 @@
 - [ ] Figure out a sensible IV
 - [ ] QoL settings like hash/randomize/encrypt filenames (ew)
 - [x] Catppucin theme
-- [ ] Add Ui lock to prevent user from deleting same entry twice.
+- [x] Add Ui lock to prevent user from deleting same entry twice.
     - It already returns an error message if they try to delete same file twice so it's not destructive
 - [ ] Try and integrate with the local Gdrive client thing (this probably only exists on Windows)
 

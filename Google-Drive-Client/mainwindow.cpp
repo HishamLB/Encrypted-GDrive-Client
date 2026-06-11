@@ -265,6 +265,17 @@ void MainWindow::getAllFiles()
     });
 }
 
+QWidget* MainWindow::createBlocking(){
+    QWidget *overlay = new QWidget(this);
+    overlay->setGeometry(this->rect());
+    overlay->setStyleSheet("background-color: rgba(0,0,0,120);");
+    overlay->show();
+    overlay->raise();
+    overlay->setEnabled(true);
+    overlay->grabMouse();
+    return overlay;
+}
+
 void MainWindow::deleteFile(const QString fileId)
 {
     auto result = QMessageBox::question(this, "Delete File",
@@ -277,10 +288,13 @@ void MainWindow::deleteFile(const QString fileId)
     QUrl url(
         QString("https://www.googleapis.com/drive/v3/files/%1")
             .arg(fileId));
-
     QNetworkReply *reply = apiDelete(url);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    QWidget* overlay = createBlocking();
+
+    connect(reply, &QNetworkReply::finished, this, [this, reply, overlay]() {
+        overlay->releaseMouse();
+        overlay->deleteLater();
 
         if (reply->error() == QNetworkReply::NoError) {
             QMessageBox::information(this, "Success", "File deleted.");
@@ -358,10 +372,13 @@ void MainWindow::download(QString fileId, QString name){
     // send
     QNetworkReply *reply = apiCall(url);
 
+    QWidget* overlay = createBlocking();
     connect(reply, &QNetworkReply::finished,
             this,
-            [this, reply, savePath, name]()
+            [this, reply, savePath, name, overlay]()
             {
+        overlay->releaseMouse();
+        overlay->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
             qDebug() << reply->errorString();
             reply->deleteLater();
@@ -533,7 +550,10 @@ void MainWindow::uploadFile(const QString &filePath)
         QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
         multiPart);
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, zipPath]() {
+    QWidget* overlay = createBlocking();
+    connect(reply, &QNetworkReply::finished, this, [this, reply, zipPath, overlay]() {
+        overlay->releaseMouse();
+        overlay->deleteLater();
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Upload success:";
             qDebug().noquote() << reply->readAll();

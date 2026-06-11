@@ -30,6 +30,7 @@ private:
     bool authed;
     settings* settingsPage;
     void decryptFileName(QString&);
+    QWidget* createBlocking();
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     void download(QString, QString);
