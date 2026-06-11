@@ -17,6 +17,11 @@ const char* defaultStylesheet = R"(
     QWidget#driveItemCell {
         border: 1px solid gray;
     }
+    QFrame#formFrame {
+        border: 1px solid palette(mid);
+        border-radius: 8px;
+        background: palette(window);
+    }
     QRadioButton {
         spacing: 8px;
     }
@@ -48,6 +53,11 @@ const char* catppuccinStylesheet = R"(
     QWidget#driveItemCell {
         background-color: #24273a;
         border: 1px solid #363a4f;
+    }
+    QFrame#formFrame {
+        border: 1px solid #363a4f;
+        border-radius: 8px;
+        background-color: #1e2030;
     }
     QPushButton {
         background-color: #363a4f;
@@ -183,6 +193,25 @@ const char* catppuccinStylesheet = R"(
         border: 2px solid #8aadf4;
     }
     QRadioButton::indicator:hover {
+        border: 2px solid #8aadf4;
+    }
+    QCheckBox {
+        color: #cad3f5;
+        spacing: 8px;
+        font-size: 13px;
+    }
+    QCheckBox::indicator {
+        width: 18px;
+        height: 18px;
+        border: 2px solid #5b6078;
+        border-radius: 4px;
+        background: #24273a;
+    }
+    QCheckBox::indicator:checked {
+        background: #8aadf4;
+        border: 2px solid #8aadf4;
+    }
+    QCheckBox::indicator:hover {
         border: 2px solid #8aadf4;
     }
     QMenuBar {

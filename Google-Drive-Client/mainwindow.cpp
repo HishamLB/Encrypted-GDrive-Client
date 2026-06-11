@@ -148,10 +148,6 @@ MainWindow::MainWindow(QWidget *parent)
             });
 
     connect(ui->settings_button, &QPushButton::clicked, this, &MainWindow::showSettingsPage);
-    auto *scrollArea = new QScrollArea(ui->page_main);
-    scrollArea->setGeometry(90, 90, 651, 460);
-    scrollArea->setWidget(ui->gridLayoutWidget);
-    scrollArea->setWidgetResizable(true);
 
     authed = restoreToken();
 
