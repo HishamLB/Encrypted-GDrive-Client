@@ -55,16 +55,14 @@ static bool restoreToken()
     oauth = new QOAuth2AuthorizationCodeFlow();
     oauth->setClientIdentifier(QString::fromStdString(getEnv("CLIENT_ID")));
     oauth->setClientIdentifierSharedKey(QString::fromStdString(getEnv("CLIENT_SECRET")));
-    oauth->setTokenUrl(QUrl("https://oauth2.googleapis.com/token"));
+    oauth->setAccessTokenUrl(QUrl("https://oauth2.googleapis.com/token"));
     oauth->setAuthorizationUrl(QUrl("https://accounts.google.com/o/oauth2/v2/auth"));
-    oauth->setRequestedScopeTokens({"https://www.googleapis.com/auth/drive.file"});
+    oauth->setScope("https://www.googleapis.com/auth/drive.file");
     oauth->setToken(accessToken);
 
     QString refreshToken = obj["refresh_token"].toString();
-    if (!refreshToken.isEmpty()) {
+    if (!refreshToken.isEmpty())
         oauth->setRefreshToken(refreshToken);
-        oauth->refreshTokens();
-    }
 
     return true;
 

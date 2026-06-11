@@ -17,7 +17,7 @@ jobs:
       uses: jurplel/install-qt-action@v4
       with:
         version: '6.7.2'
-        packages: qtbase qtnetworkauth
+        modules: qtnetworkauth qt5compat
 
     - name: Install system deps
       run: sudo apt-get update && sudo apt-get install -y libquazip1-qt6-dev libgl1-mesa-dev

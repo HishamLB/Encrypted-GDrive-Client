@@ -47,13 +47,13 @@ void setup::googlesignin()
     oauth->setAuthorizationUrl(
         QUrl("https://accounts.google.com/o/oauth2/v2/auth"));
 
-    oauth->setTokenUrl(
+    oauth->setAccessTokenUrl(
         QUrl("https://oauth2.googleapis.com/token"));
 
     oauth->setClientIdentifier(QString::fromStdString(getEnv("CLIENT_ID")));
     oauth->setClientIdentifierSharedKey(QString::fromStdString(getEnv("CLIENT_SECRET")));
 
-    oauth->setRequestedScopeTokens({"https://www.googleapis.com/auth/drive.file"});
+    oauth->setScope("https://www.googleapis.com/auth/drive.file");
 
     auto replyHandler =
         new QOAuthHttpServerReplyHandler(
