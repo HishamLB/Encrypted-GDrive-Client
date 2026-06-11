@@ -16,6 +16,7 @@
 #include <QCoreApplication>
 #include <QGridLayout>
 #include <QScrollArea>
+#include <QElapsedTimer>
 #include <QMessageBox>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -486,6 +487,10 @@ void MainWindow::uploadFile(const QString &filePath)
 
     QString zipPath = QDir::temp().filePath(info.fileName() + ".zip");
 
+    QElapsedTimer timer;
+
+    timer.start();
+
     QuaZip zip(zipPath);
     if (!zip.open(QuaZip::mdCreate)) {
         qDebug() << "Failed to create zip";
@@ -504,6 +509,7 @@ void MainWindow::uploadFile(const QString &filePath)
     zipFile.close();
     zip.close();
     sourceFile.close();
+    qDebug() << "Temp zip created in " << timer.elapsed() << "ms";
 
     // READ ZIP INTO MEMORY
     QFile zipIn(zipPath);
@@ -512,8 +518,14 @@ void MainWindow::uploadFile(const QString &filePath)
         return;
     }
 
+    timer.start();
+
     QByteArray plainData = zipIn.readAll();
     zipIn.close();
+
+    qDebug() << "Temp zip read in " << timer.elapsed() << "ms";
+
+    timer.start();
 
     // ENCRYPT DATA
     QAESEncryption enc(QAESEncryption::AES_256,
@@ -522,6 +534,9 @@ void MainWindow::uploadFile(const QString &filePath)
 
 
     QByteArray cipher = enc.encode(plainData, aes_key, iv);
+
+
+    qDebug() << "Encryption done in " << timer.elapsed() << "ms";
 
     // PREPARE MULTIPART UPLOAD
     QHttpMultiPart *multiPart =

@@ -13,20 +13,20 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-   <layout class="QVBoxLayout" name="settingsLayout">
-    <property name="leftMargin">
-     <number>30</number>
-    </property>
-    <property name="topMargin">
-     <number>30</number>
-    </property>
-    <item>
+  <layout class="QVBoxLayout" name="settingsLayout">
+   <property name="leftMargin">
+    <number>30</number>
+   </property>
+   <property name="topMargin">
+    <number>30</number>
+   </property>
+   <item>
     <widget class="QFrame" name="formFrame">
      <property name="frameShape">
-      <enum>QFrame::StyledPanel</enum>
+      <enum>QFrame::Shape::StyledPanel</enum>
      </property>
      <property name="frameShadow">
-      <enum>QFrame::Raised</enum>
+      <enum>QFrame::Shadow::Raised</enum>
      </property>
      <layout class="QFormLayout" name="formLayout">
       <property name="leftMargin">
@@ -66,6 +66,13 @@
        <widget class="QCheckBox" name="encryptFileName">
         <property name="text">
          <string>Encrypt File Names*</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QCheckBox" name="debugMode">
+        <property name="text">
+         <string>Debug Mode</string>
         </property>
        </widget>
       </item>

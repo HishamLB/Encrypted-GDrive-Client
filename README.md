@@ -18,4 +18,5 @@
 
 - [x] Save configuration somewhere
 - [x] CI with gh actions
+- [ ] Move away from using libraries for encryption (slow)
 
