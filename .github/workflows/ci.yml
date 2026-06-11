@@ -13,10 +13,14 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Install Qt6 and system deps
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y qt6-base-dev qt6-networkauth-dev libquazip1-qt6-dev libgl1-mesa-dev
+    - name: Install Qt
+      uses: jurplel/install-qt-action@v4
+      with:
+        version: '6.7.2'
+        packages: qtbase qtnetworkauth
+
+    - name: Install system deps
+      run: sudo apt-get update && sudo apt-get install -y libquazip1-qt6-dev libgl1-mesa-dev
 
     - name: Build QtAES from source
       run: |
