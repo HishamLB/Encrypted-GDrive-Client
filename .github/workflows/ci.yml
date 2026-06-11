@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Qt6 and system deps
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y qt6-base-dev qt6-networkauth-dev libquazip1-qt6-dev libgl1-mesa-dev
+
+    - name: Build QtAES from source
+      run: |
+        git clone https://github.com/OpenCryptoProject/QtAES.git /tmp/QtAES
+        cmake -S /tmp/QtAES -B /tmp/QtAES/build -DCMAKE_BUILD_TYPE=Release
+        cmake --build /tmp/QtAES/build
+        sudo cmake --install /tmp/QtAES/build
+
+    - name: Configure project
+      run: cmake -S Google-Drive-Client -B build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build project
+      run: cmake --build build
