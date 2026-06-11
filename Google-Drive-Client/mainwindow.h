@@ -29,6 +29,7 @@ private:
     void readConfig();
     bool authed;
     settings* settingsPage;
+    void decryptFileName(QString&);
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
     void download(QString, QString);

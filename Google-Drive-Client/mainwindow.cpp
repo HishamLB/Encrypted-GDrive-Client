@@ -310,6 +310,24 @@ QNetworkReply* MainWindow::apiDelete(const QUrl url)
     return networkManager->deleteResource(request);
 }
 
+void MainWindow::decryptFileName(QString& name){
+
+        QAESEncryption enc(QAESEncryption::AES_256,
+                       QAESEncryption::CBC,
+                       QAESEncryption::PKCS7);
+
+    QByteArray iv = "IDONTCAREIDONTCA";
+        QByteArray cipher = QByteArray::fromBase64(
+        name.toLatin1(),
+        QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals      // not sure if this is unnecessary
+        );
+
+    QByteArray plain = enc.decode(cipher, aes_key, iv);
+
+        plain = enc.removePadding(plain);
+
+    name = QString::fromUtf8(plain);}
+
 void MainWindow::download(QString fileId, QString name){
     // @param {string} fileId (ID to download)
     // @return {Blob} file content as a Blob.
@@ -322,6 +340,11 @@ void MainWindow::download(QString fileId, QString name){
         cleanName.chop(8);
     else if (cleanName.endsWith(".zip"))
         cleanName.chop(4);
+
+    if (cleanName.contains("enc_")){
+        cleanName = cleanName.mid(4);
+        decryptFileName(cleanName);
+    }
 
     QString savePath =
         QFileDialog::getSaveFileName(
@@ -436,7 +459,8 @@ static QString encryptedFileName(const QString &name)
                        QAESEncryption::CBC,
                        QAESEncryption::PKCS7);
     QByteArray encName = enc.encode(name.toUtf8(), aes_key, iv);
-    return QString::fromLatin1(encName.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+    QString b64 = QString::fromLatin1(encName.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
+    return "enc_" + b64;
 }
 
 void MainWindow::uploadFile(const QString &filePath)
