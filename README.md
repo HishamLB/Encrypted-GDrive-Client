@@ -17,5 +17,5 @@
 - [ ] Try and integrate with the local Gdrive client thing (this probably only exists on Windows)
 
 - [x] Save configuration somewhere
-- [ ] CI with gh actions
+- [x] CI with gh actions
 
