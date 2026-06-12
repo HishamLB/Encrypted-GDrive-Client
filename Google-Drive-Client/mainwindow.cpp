@@ -323,20 +323,27 @@ QNetworkReply* MainWindow::apiDelete(const QUrl url)
 
 void MainWindow::decryptFileName(QString& name){
 
-        QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
-
-    QByteArray iv = "IDONTCAREIDONTCA";
-        QByteArray cipher = QByteArray::fromBase64(
+    QByteArray cipher = QByteArray::fromBase64(
         name.toLatin1(),
-        QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals      // not sure if this is unnecessary
-        );
+        QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals
+    );
 
-    QByteArray plain = enc.decode(cipher, aes_key, iv);
+    QProcess process;
+    QStringList args;
+    args << "enc"
+         << "-d"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+    if (!process.waitForStarted())
+        return;
+    process.write(cipher);
+    process.closeWriteChannel();
+    if (!process.waitForFinished())
+        return;
 
-        plain = enc.removePadding(plain);
-
+    QByteArray plain = process.readAllStandardOutput();
     name = QString::fromUtf8(plain);}
 
 void MainWindow::download(QString fileId, QString name){
@@ -511,10 +518,20 @@ static QString encryptedFileName(const QString &name)
 {
     if (!encryptFileNames)
         return name;
-    QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
-    QByteArray encName = enc.encode(name.toUtf8(), aes_key, iv);
+    QProcess process;
+    QStringList args;
+    args << "enc"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+    if (!process.waitForStarted())
+        return name;
+    process.write(name.toUtf8());
+    process.closeWriteChannel();
+    if (!process.waitForFinished())
+        return name;
+    QByteArray encName = process.readAllStandardOutput();
     QString b64 = QString::fromLatin1(encName.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
     return "enc_" + b64;
 }
