@@ -26,7 +26,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QAESEncryption>
 #include <quazip.h>
 #include <quazipfile.h>
 #include <qtimer.h>
