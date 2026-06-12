@@ -6,3 +6,4 @@ bool catppuccinTheme = false;
 QByteArray iv;
 
 bool encryptFileNames;
+bool debug;

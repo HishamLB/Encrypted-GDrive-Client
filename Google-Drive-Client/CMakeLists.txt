@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.19)
 project(Google-Drive-Client LANGUAGES CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Qt6 6.4 REQUIRED COMPONENTS Core Widgets Network NetworkAuth)
-find_package(QtAES REQUIRED)
 find_package(QuaZip-Qt6 REQUIRED)
 
 qt_standard_project_setup()
@@ -37,7 +36,6 @@ target_link_libraries(Google-Drive-Client
         Qt::Widgets
         Qt6::Network
         Qt6::NetworkAuth
-        QtAES::QtAES
         QuaZip::QuaZip
 )
 

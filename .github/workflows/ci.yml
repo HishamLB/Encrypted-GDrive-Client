@@ -22,13 +22,6 @@ jobs:
     - name: Install system deps
       run: sudo apt-get update && sudo apt-get install -y libquazip1-qt6-dev libgl1-mesa-dev
 
-    - name: Build QtAES from source
-      run: |
-        git clone https://github.com/bricke/Qt-AES.git /tmp/QtAES
-        cmake -S /tmp/QtAES -B /tmp/QtAES/build -DCMAKE_BUILD_TYPE=Release
-        cmake --build /tmp/QtAES/build
-        sudo cmake --install /tmp/QtAES/build
-
     - name: Configure project
       run: cmake -S Google-Drive-Client -B build -DCMAKE_BUILD_TYPE=Release
 

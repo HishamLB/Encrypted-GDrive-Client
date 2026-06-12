@@ -239,6 +239,7 @@ void settings::writeToConfig(){
     }
     obj["theme"] = theme;
     obj["encryptfilenames"] = ui->encryptFileName->isChecked();
+    obj["debug"] = ui->debugMode->isChecked();
 
     // does write order matter?
     if (configFile.open(QIODevice::WriteOnly))

@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QDirIterator>
 #include <QPushButton>
+#include <QProcess>
 #include <QIcon>
 #include <QFile>
 #include <QDir>
@@ -16,6 +17,7 @@
 #include <QCoreApplication>
 #include <QGridLayout>
 #include <QScrollArea>
+#include <QElapsedTimer>
 #include <QMessageBox>
 #include <QNetworkRequest>
 #include <QNetworkReply>
@@ -24,7 +26,6 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
-#include <QAESEncryption>
 #include <quazip.h>
 #include <quazipfile.h>
 #include <qtimer.h>
@@ -82,6 +83,8 @@ void MainWindow::readConfig(){
     bool readEncryptFileNames = obj["encryptfilenames"].toBool();
     encryptFileNames = readEncryptFileNames;
 
+    bool debugMode = obj["debug"].toBool();
+    debug = debugMode;
 
     catppuccinTheme = (theme == 1);
     if (catppuccinTheme) {
@@ -320,20 +323,27 @@ QNetworkReply* MainWindow::apiDelete(const QUrl url)
 
 void MainWindow::decryptFileName(QString& name){
 
-        QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
-
-    QByteArray iv = "IDONTCAREIDONTCA";
-        QByteArray cipher = QByteArray::fromBase64(
+    QByteArray cipher = QByteArray::fromBase64(
         name.toLatin1(),
-        QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals      // not sure if this is unnecessary
-        );
+        QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals
+    );
 
-    QByteArray plain = enc.decode(cipher, aes_key, iv);
+    QProcess process;
+    QStringList args;
+    args << "enc"
+         << "-d"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+    if (!process.waitForStarted())
+        return;
+    process.write(cipher);
+    process.closeWriteChannel();
+    if (!process.waitForFinished())
+        return;
 
-        plain = enc.removePadding(plain);
-
+    QByteArray plain = process.readAllStandardOutput();
     name = QString::fromUtf8(plain);}
 
 void MainWindow::download(QString fileId, QString name){
@@ -368,12 +378,17 @@ void MainWindow::download(QString fileId, QString name){
     QUrl url = "https://www.googleapis.com/drive/v3/files/" + fileId + "?alt=media";
 
     // send
+    QElapsedTimer timer;
+
+    if(debug)
+        timer.start();
+
     QNetworkReply *reply = apiCall(url);
 
     QWidget* overlay = createBlocking();
     connect(reply, &QNetworkReply::finished,
             this,
-            [this, reply, savePath, name, overlay]()
+            [this, reply, savePath, name, overlay, timer]() mutable
             {
         overlay->releaseMouse();
         overlay->deleteLater();
@@ -385,14 +400,48 @@ void MainWindow::download(QString fileId, QString name){
 
         QByteArray encryptedFile = reply->readAll();
 
-        QAESEncryption enc(QAESEncryption::AES_256,
-                           QAESEncryption::CBC,
-                           QAESEncryption::PKCS7);
+        if(debug)
+            qDebug() << "Downloaded in " << timer.elapsed() << "ms";
 
-        QByteArray iv = "IDONTCAREIDONTCA";
+        if(debug)
+            timer.start();
 
-        QByteArray zipData = enc.decode(encryptedFile, aes_key, iv);
-        zipData = enc.removePadding(zipData);
+        QProcess process;
+
+        QStringList args;
+        args << "enc"
+             << "-d"
+             << "-aes-256-cbc"
+             << "-K" << aes_key.toHex()
+             << "-iv" << iv.toHex();
+
+        process.start("openssl", args);
+
+        if (!process.waitForStarted()) {
+            qDebug() << "Failed to start OpenSSL";
+            return;
+        }
+
+        process.write(encryptedFile);   // encrypted data
+        process.closeWriteChannel();
+
+        if (!process.waitForFinished()) {
+            qDebug() << "OpenSSL failed";
+            return;
+        }
+
+        QByteArray zipData = process.readAllStandardOutput();
+
+        QByteArray errorOutput = process.readAllStandardError();
+        if (!errorOutput.isEmpty()) {
+            qDebug() << "OpenSSL error:" << errorOutput;
+        }
+
+        if(debug)
+            qDebug() << "Decryption done in " << timer.elapsed() << "ms";
+
+        if(debug)
+            timer.start();
 
         // always zip
         QString tempZip = savePath + ".zip";
@@ -455,6 +504,9 @@ void MainWindow::download(QString fileId, QString name){
         zip.close();
         QFile::remove(tempZip);
 
+        if(debug)
+            qDebug() << "Zip extracted in " << timer.elapsed() << "ms";
+
         qDebug() << "Restore complete";
 
         reply->deleteLater();
@@ -466,10 +518,20 @@ static QString encryptedFileName(const QString &name)
 {
     if (!encryptFileNames)
         return name;
-    QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
-    QByteArray encName = enc.encode(name.toUtf8(), aes_key, iv);
+    QProcess process;
+    QStringList args;
+    args << "enc"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+    if (!process.waitForStarted())
+        return name;
+    process.write(name.toUtf8());
+    process.closeWriteChannel();
+    if (!process.waitForFinished())
+        return name;
+    QByteArray encName = process.readAllStandardOutput();
     QString b64 = QString::fromLatin1(encName.toBase64(QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals));
     return "enc_" + b64;
 }
@@ -485,6 +547,11 @@ void MainWindow::uploadFile(const QString &filePath)
     QFileInfo info(filePath);
 
     QString zipPath = QDir::temp().filePath(info.fileName() + ".zip");
+
+    QElapsedTimer timer;
+
+    if(debug)
+        timer.start();
 
     QuaZip zip(zipPath);
     if (!zip.open(QuaZip::mdCreate)) {
@@ -505,6 +572,9 @@ void MainWindow::uploadFile(const QString &filePath)
     zip.close();
     sourceFile.close();
 
+    if(debug)
+        qDebug() << "Temp zip created in " << timer.elapsed() << "ms";
+
     // READ ZIP INTO MEMORY
     QFile zipIn(zipPath);
     if (!zipIn.open(QIODevice::ReadOnly)) {
@@ -512,16 +582,51 @@ void MainWindow::uploadFile(const QString &filePath)
         return;
     }
 
+    if(debug)
+        timer.start();
+
     QByteArray plainData = zipIn.readAll();
     zipIn.close();
 
-    // ENCRYPT DATA
-    QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
+    if(debug)
+        qDebug() << "Temp zip read in " << timer.elapsed() << "ms";
+
+    if(debug)
+        timer.start();
 
 
-    QByteArray cipher = enc.encode(plainData, aes_key, iv);
+    QProcess process;
+
+    QStringList args;
+    args << "enc"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+
+    if (!process.waitForStarted()) {
+        qDebug() << "Failed to start OpenSSL";
+        return;
+    }
+    process.write(plainData);
+    process.closeWriteChannel();
+    if (!process.waitForFinished()) {
+        qDebug() << "OpenSSL failed";
+        return;
+    }
+
+    QByteArray cipher = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+    if (!errorOutput.isEmpty()) {
+        qDebug() << "OpenSSL error:" << errorOutput;
+    }
+
+    if(debug)
+        qDebug() << "Encryption done in " << timer.elapsed() << "ms";
+
+
+    if(debug)
+        timer.start();
 
     // PREPARE MULTIPART UPLOAD
     QHttpMultiPart *multiPart =
@@ -543,15 +648,23 @@ void MainWindow::uploadFile(const QString &filePath)
     multiPart->append(metaPart);
     multiPart->append(filePart);
 
+    if(debug)
+        qDebug() << "Request assembled in " << timer.elapsed() << "ms";
+
+    if(debug)
+        timer.start();
+
     // SEND
     QNetworkReply *reply = apiCall(
-        QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
-        multiPart);
+                QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
+                multiPart);
 
     QWidget* overlay = createBlocking();
-    connect(reply, &QNetworkReply::finished, this, [this, reply, zipPath, overlay]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, zipPath, overlay, timer]() {
         overlay->releaseMouse();
         overlay->deleteLater();
+        if(debug)
+            qDebug() << "Uploaded in " << timer.elapsed() << "ms";
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Upload success:";
             qDebug().noquote() << reply->readAll();
@@ -597,6 +710,11 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
     QString zipPath = QDir::temp().filePath(folderInfo.fileName() + ".zip");
     QString encPath = zipPath + ".enc";
 
+    QElapsedTimer timer;
+
+    if(debug)
+        timer.start();
+
     QuaZip zip(zipPath);
     if (!zip.open(QuaZip::mdCreate)) {
         qDebug() << "Failed to create zip";
@@ -632,22 +750,53 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
     }
 
     zip.close();
+
+    if(debug)
+        qDebug() << "Temp zip created in " << timer.elapsed() << "ms";
+
     QFile in(zipPath);
     if (!in.open(QIODevice::ReadOnly)) {
         qDebug() << "Cannot open zip";
         return;
     }
 
+    if(debug)
+        timer.start();
+
     QByteArray zipData = in.readAll();
     in.close();
 
-    QAESEncryption enc(QAESEncryption::AES_256,
-                       QAESEncryption::CBC,
-                       QAESEncryption::PKCS7);
+    if(debug)
+        qDebug() << "Temp zip read in " << timer.elapsed() << "ms";
 
+    if(debug)
+        timer.start();
 
-    QByteArray encrypted = enc.encode(zipData, aes_key, iv);
+    QProcess process;
 
+    QStringList args;
+    args << "enc"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+
+    if (!process.waitForStarted()) {
+        qDebug() << "Failed to start OpenSSL";
+        return;
+    }
+    process.write(zipData);
+    process.closeWriteChannel();
+    if (!process.waitForFinished()) {
+        qDebug() << "OpenSSL failed";
+        return;
+    }
+
+    QByteArray encrypted = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+    if (!errorOutput.isEmpty()) {
+        qDebug() << "OpenSSL error:" << errorOutput;
+    }
     QFile out(encPath);
     if (!out.open(QIODevice::WriteOnly)) {
         qDebug() << "Cannot write encrypted file";
@@ -656,6 +805,12 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
 
     out.write(encrypted);
     out.close();
+
+    if(debug)
+        qDebug() << "Encryption done in " << timer.elapsed() << "ms";
+
+    if(debug)
+        timer.start();
 
     // upload zip
     QFile *zipFile = new QFile(encPath);
@@ -684,12 +839,20 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
     multiPart->append(metaPart);
     multiPart->append(filePart);
 
+    if(debug)
+        qDebug() << "Request assembled in " << timer.elapsed() << "ms";
+
+    if(debug)
+        timer.start();
+
     QNetworkReply *reply = apiCall(
         QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
         multiPart
         );
 
-    connect(reply, &QNetworkReply::finished, this, [this, reply, encPath]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, encPath, timer]() {
+        if(debug)
+            qDebug() << "Uploaded in " << timer.elapsed() << "ms";
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Folder upload success";
             QFile::remove(encPath);

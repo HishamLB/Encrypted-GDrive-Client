@@ -10,6 +10,7 @@ extern QByteArray aes_key;
 extern QByteArray iv;
 extern bool catppuccinTheme;
 extern bool encryptFileNames;
+extern bool debug;
 
 static QString configPath()
 {
