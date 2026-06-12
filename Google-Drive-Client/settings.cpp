@@ -237,6 +237,10 @@ void settings::writeToConfig(){
     if(ui->default_radio->isChecked()){
         theme = 0;
     }
+    if(ui->debugMode->isChecked()){
+        debug = 1;
+    }
+
     obj["theme"] = theme;
     obj["encryptfilenames"] = ui->encryptFileName->isChecked();
     obj["debug"] = ui->debugMode->isChecked();
@@ -257,6 +261,7 @@ settings::settings(QWidget *parent)
     group->addButton(ui->catppuccin_radio);
 
     ui->encryptFileName->setChecked(encryptFileNames);       // horrible naming
+    ui->debugMode->setChecked(debug);                        // less-horrible naming
     connect(ui->back_button, &QPushButton::clicked, this, [this](){
         writeToConfig();
         emit settingsFinished();
@@ -267,6 +272,10 @@ settings::settings(QWidget *parent)
 
 void settings::setEncryptFileNamesBox(bool state){
     ui->encryptFileName->setChecked(state);
+}
+
+void settings::setDebugBox(bool state){
+    ui->debugMode->setChecked(state);
 }
 
 void settings::checkBoxEncryptedFileNames()

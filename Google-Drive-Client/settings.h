@@ -21,6 +21,7 @@ public:
     explicit settings(QWidget *parent = nullptr);
     ~settings();
     void setEncryptFileNamesBox(bool);
+    void setDebugBox(bool);
 
 private:
     Ui::settings *ui;

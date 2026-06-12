@@ -181,6 +181,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::showSettingsPage(){
     settingsPage->setEncryptFileNamesBox(encryptFileNames);
+    settingsPage->setDebugBox(debug);
     ui->stackedWidget->setCurrentIndex(2);
 }
 
