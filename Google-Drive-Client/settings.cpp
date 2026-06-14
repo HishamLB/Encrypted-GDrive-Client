@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QProcess>
 
 const char* defaultStylesheet = R"(
     * {
@@ -245,9 +246,26 @@ void settings::writeToConfig(){
     obj["encryptfilenames"] = ui->encryptFileName->isChecked();
     obj["debug"] = ui->debugMode->isChecked();
 
-    // does write order matter?
+    QByteArray jsonData = QJsonDocument(obj).toJson();
+
+    QProcess process;
+    QStringList args;
+    args << "enc"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+    if (!process.waitForStarted())
+        return;
+    process.write(jsonData);
+    process.closeWriteChannel();
+    if (!process.waitForFinished())
+        return;
+
+    QByteArray encrypted = process.readAllStandardOutput();
+
     if (configFile.open(QIODevice::WriteOnly))
-        configFile.write(QJsonDocument(obj).toJson());
+        configFile.write(encrypted);
 }
 
 settings::settings(QWidget *parent)

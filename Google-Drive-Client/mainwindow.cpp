@@ -76,7 +76,25 @@ void MainWindow::readConfig(){
     if (!configFile.open(QIODevice::ReadOnly))
         return;
 
-    QJsonObject obj = QJsonDocument::fromJson(configFile.readAll()).object();
+    QByteArray encrypted = configFile.readAll();
+
+    QProcess process;
+    QStringList args;
+    args << "enc"
+         << "-d"
+         << "-aes-256-cbc"
+         << "-K" << aes_key.toHex()
+         << "-iv" << iv.toHex();
+    process.start("openssl", args);
+    if (!process.waitForStarted())
+        return;
+    process.write(encrypted);
+    process.closeWriteChannel();
+    if (!process.waitForFinished())
+        return;
+
+    QByteArray jsonData = process.readAllStandardOutput();
+    QJsonObject obj = QJsonDocument::fromJson(jsonData).object();
 
     QJsonObject filesObj = obj["files"].toObject();
 
