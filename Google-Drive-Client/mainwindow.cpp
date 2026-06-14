@@ -78,6 +78,13 @@ void MainWindow::readConfig(){
 
     QJsonObject obj = QJsonDocument::fromJson(configFile.readAll()).object();
 
+    QJsonObject filesObj = obj["files"].toObject();
+
+
+    for(auto it = filesObj.begin(); it!= filesObj.end(); ++it){
+        files[it.key()] = it.value().toString();
+    }
+
     qint32 theme = obj["theme"].toInt();
 
     bool readEncryptFileNames = obj["encryptfilenames"].toBool();
@@ -108,6 +115,9 @@ void MainWindow::readConfig(){
                 btn->setIcon(delIcon);
         }
     }
+
+
+
 }
 
 void MainWindow::refreshIndicator(){
@@ -386,10 +396,11 @@ void MainWindow::download(QString fileId, QString name){
 
     QNetworkReply *reply = apiCall(url);
 
+
     QWidget* overlay = createBlocking();
     connect(reply, &QNetworkReply::finished,
             this,
-            [this, reply, savePath, name, overlay, timer]() mutable
+            [this, reply, fileId, savePath, name, overlay, timer]() mutable
             {
         overlay->releaseMouse();
         overlay->deleteLater();
@@ -408,6 +419,12 @@ void MainWindow::download(QString fileId, QString name){
             timer.start();
 
         QProcess process;
+
+        QString encryptionMethod = files[fileId];
+
+        if(encryptionMethod != "AES-256"){
+            qDebug() << encryptionMethod;
+        }
 
         QStringList args;
         args << "enc"
@@ -668,6 +685,18 @@ void MainWindow::uploadFile(const QString &filePath)
             qDebug() << "Uploaded in " << timer.elapsed() << "ms";
         if (reply->error() == QNetworkReply::NoError) {
             qDebug() << "Upload success:";
+
+            QByteArray data = reply->readAll();
+
+            QJsonDocument doc = QJsonDocument::fromJson(data);
+            QJsonObject obj = doc.object();
+            QString id = obj["id"].toString();
+
+            files[id] = "AES-256"; // test val
+
+            writeFilesToConfig();
+
+
             qDebug().noquote() << reply->readAll();
 
             QFile::remove(zipPath);
@@ -679,6 +708,32 @@ void MainWindow::uploadFile(const QString &filePath)
 
         reply->deleteLater();
     });
+}
+
+void MainWindow::writeFilesToConfig(){
+    QFile configFile(configPath());
+
+    QJsonObject root;
+
+     // Read existing config if it exists
+    if (configFile.open(QIODevice::ReadOnly)) {
+        QJsonDocument doc = QJsonDocument::fromJson(configFile.readAll());
+        root = doc.object();
+        configFile.close();
+    }
+
+    qDebug() << files;
+    QJsonObject filesObj;
+      for (auto it = files.begin(); it != files.end(); ++it) {
+        filesObj[it.key()] = it.value();
+    }
+
+      root["files"] = filesObj;
+    if (configFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+          configFile.write(QJsonDocument(root).toJson());
+        configFile.close();
+    }
+
 }
 
 void MainWindow::upload()

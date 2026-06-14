@@ -29,6 +29,8 @@ private:
     void readConfig();
     bool authed;
     settings* settingsPage;
+    void writeFilesToConfig();
+    QMap<QString, QString> files;
     void decryptFileName(QString&);
     QWidget* createBlocking();
     Ui::MainWindow *ui;
