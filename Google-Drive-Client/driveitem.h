@@ -9,6 +9,7 @@ public:
     QString fileId;
     QString name;
     QString mimetype; // for folder heirarchy
+    QString size;
 };
 
 #endif // DRIVEITEM_H
