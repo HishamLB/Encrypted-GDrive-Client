@@ -233,7 +233,7 @@ QNetworkReply* MainWindow::apiCall(const QUrl &url, QHttpMultiPart *multiPart)
 
 void MainWindow::getAllFiles()
 {
-    QNetworkReply *reply = apiCall(QUrl("https://www.googleapis.com/drive/v3/files?fields=files(id,name,mimeType,parents)"));
+    QNetworkReply *reply = apiCall(QUrl("https://www.googleapis.com/drive/v3/files?fields=files(id,name,mimeType,parents,size)"));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         if (reply->error() != QNetworkReply::NoError) {
             qDebug() << "List failed:" << reply->errorString();
@@ -244,36 +244,49 @@ void MainWindow::getAllFiles()
         QJsonDocument doc = QJsonDocument::fromJson(reply->readAll());
         QJsonArray files = doc.object()["files"].toArray();
 
-        QGridLayout *grid = ui->items;
-        while (auto *item = grid->takeAt(0)) {
-            if (auto *w = item->widget())
-                delete w;
-            delete item;
-        }
+        auto *table = ui->fileTable;
+        table->setRowCount(0);
+        table->setColumnCount(3);
+        table->setHorizontalHeaderLabels({"Name", "Size", "Actions"});
+        table->setSelectionBehavior(QAbstractItemView::SelectRows);
+        table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+        table->setColumnWidth(1, 100);
+        table->setColumnWidth(2, 100);
         driveItems.clear();
 
-        int cols = 3;
         for (int i = 0; i < files.size(); ++i) {
             QJsonObject obj = files[i].toObject();
             driveItem item;
             item.fileId = obj["id"].toString();
             item.name = obj["name"].toString();
             item.mimetype = obj["mimeType"].toString();
+            item.size = obj["size"].toString();
+            qint32 sz = item.size.toInt() * 1e-6;
             bool isFolder = (item.mimetype == "application/vnd.google-apps.folder");
 
             driveItems.push_back(item);
-            if(isFolder) qDebug() << "aa";
-            auto *cell = new QWidget(ui->gridLayoutWidget);
-            auto *vl = new QVBoxLayout(cell);
-            auto *nameLabel = new QLabel(item.name, cell);
-            nameLabel->setAlignment(Qt::AlignCenter);
-            vl->addWidget(nameLabel);
 
-            auto *btnRow = new QHBoxLayout;
-            auto *dlBtn = new QPushButton(cell);
+            int row = table->rowCount();
+            table->insertRow(row);
+
+            auto *nameItem = new QTableWidgetItem(item.name);
+            nameItem->setFlags(nameItem->flags() & ~Qt::ItemIsEditable);
+            table->setItem(row, 0, nameItem);
+
+            QString sizeStr = isFolder ? "-" : QString::number(sz) + " MB";
+            auto *sizeItem = new QTableWidgetItem(sizeStr);
+            sizeItem->setFlags(sizeItem->flags() & ~Qt::ItemIsEditable);
+            sizeItem->setTextAlignment(Qt::AlignRight | Qt::AlignVCenter);
+            table->setItem(row, 1, sizeItem);
+
+            auto *actionWidget = new QWidget;
+            auto *btnLayout = new QHBoxLayout(actionWidget);
+            btnLayout->setContentsMargins(2, 2, 2, 2);
+            auto *dlBtn = new QPushButton;
             dlBtn->setObjectName("downloadBtn");
             dlBtn->setIcon(QIcon(catppuccinTheme ? ":/download_catpp.png" : ":/download.png"));
-            auto *delBtn = new QPushButton(cell);
+            auto *delBtn = new QPushButton;
             delBtn->setObjectName("deleteBtn");
             delBtn->setIcon(QIcon(catppuccinTheme ? ":/trash_catpp.png" : ":/trash.png"));
             connect(dlBtn, &QPushButton::clicked, this, [this, item]() {
@@ -282,14 +295,9 @@ void MainWindow::getAllFiles()
             connect(delBtn, &QPushButton::clicked, this, [this, item]() {
                 deleteFile(item.fileId);
             });
-            btnRow->addStretch();
-            btnRow->addWidget(dlBtn);
-            btnRow->addWidget(delBtn);
-            vl->addLayout(btnRow);
-
-            cell->setObjectName("driveItemCell");
-            cell->setMinimumSize(160, 100);
-            grid->addWidget(cell, i / cols, i % cols);
+            btnLayout->addWidget(dlBtn);
+            btnLayout->addWidget(delBtn);
+            table->setCellWidget(row, 2, actionWidget);
         }
         reply->deleteLater();
     });

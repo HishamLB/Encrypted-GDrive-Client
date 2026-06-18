@@ -75,13 +75,28 @@
          </widget>
         </item>
         <item>
-         <widget class="QScrollArea" name="scrollArea">
-          <property name="widgetResizable">
-           <bool>true</bool>
+         <widget class="QTableWidget" name="fileTable">
+          <property name="columnCount">
+           <number>3</number>
           </property>
-          <widget class="QWidget" name="gridLayoutWidget">
-           <layout class="QGridLayout" name="items"/>
-          </widget>
+          <attribute name="horizontalHeaderStretchLastSection">
+           <bool>false</bool>
+          </attribute>
+          <column>
+           <property name="text">
+            <string>Name</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Size</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
+            <string>Actions</string>
+           </property>
+          </column>
          </widget>
         </item>
        </layout>

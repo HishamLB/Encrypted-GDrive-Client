@@ -11,5 +11,6 @@
     - probably horrible idea since it's meant to be encrypted
 - [ ] Figure out a sensible IV
 - [ ] Try and integrate with the local Gdrive client thing (this probably only exists on Windows)
+- [ ] Locally decrypt files if encryptfilenames is on
 
 
