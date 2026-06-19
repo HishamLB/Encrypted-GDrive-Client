@@ -11,6 +11,7 @@ extern QByteArray iv;
 extern bool catppuccinTheme;
 extern bool encryptFileNames;
 extern bool debug;
+extern QString encryption_method;
 
 static QString configPath()
 {

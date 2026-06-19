@@ -26,6 +26,8 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <qlogging.h>
+#include <qstringview.h>
 #include <quazip.h>
 #include <quazipfile.h>
 #include <qtimer.h>
@@ -78,6 +80,7 @@ void MainWindow::readConfig(){
 
     QByteArray encrypted = configFile.readAll();
 
+    // decrypt config
     QProcess process;
     QStringList args;
     args << "enc"
@@ -99,9 +102,13 @@ void MainWindow::readConfig(){
     QJsonObject filesObj = obj["files"].toObject();
 
 
+
     for(auto it = filesObj.begin(); it!= filesObj.end(); ++it){
         files[it.key()] = it.value().toString();
     }
+
+    QString encryptionMethod = obj["encryption_method"].toString();
+    encryption_method = encryptionMethod;
 
     qint32 theme = obj["theme"].toInt();
 
@@ -139,12 +146,12 @@ void MainWindow::readConfig(){
 }
 
 void MainWindow::refreshIndicator(){
-if (authed) {
+    if (authed) {
         indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
         indicator->setToolTip("Authenticated");
         QTimer::singleShot(300, this, [this]() {
-                getAllFiles();
-                });
+            getAllFiles();
+        });
     } else {
         indicator->setStyleSheet("background-color: #ff0000; border-radius: 8px;");
         indicator->setToolTip("Not authenticated");
@@ -166,15 +173,15 @@ MainWindow::MainWindow(QWidget *parent)
     ui->stackedWidget->addWidget(settingsPage);
     connect(ui->setup_button, &QPushButton::clicked, this, &MainWindow::showSetupPage);
     connect(ui->upload_button, &QPushButton::clicked, this, &MainWindow::upload);
-    
+
     auto *folderBtn = new QPushButton("Upload Folder", ui->page_main);
     ui->horizontalLayout->insertWidget(1, folderBtn);
     connect(folderBtn, &QPushButton::clicked, this, &MainWindow::uploadFolder);
     connect(setupPage, &setup::finished, this, &MainWindow::showMainPage);
     connect(settingsPage, &settings::settingsFinished, this, [this](){
-            readConfig();
-            ui->stackedWidget->setCurrentIndex(0);
-            });
+        readConfig();
+        ui->stackedWidget->setCurrentIndex(0);
+    });
 
     connect(ui->settings_button, &QPushButton::clicked, this, &MainWindow::showSettingsPage);
 
@@ -183,15 +190,15 @@ MainWindow::MainWindow(QWidget *parent)
     indicator = new QLabel(this);
     indicator->setFixedSize(16, 16);
     indicator->move(10, 10);
-    
+
     refreshIndicator();
 
     if (authed) {
         indicator->setStyleSheet("background-color: #00ff00; border-radius: 8px;");
         indicator->setToolTip("Authenticated");
         QTimer::singleShot(300, this, [this]() {
-                getAllFiles();
-                });
+            getAllFiles();
+        });
     } else {
         indicator->setStyleSheet("background-color: #ff0000; border-radius: 8px;");
         indicator->setToolTip("Not authenticated");
@@ -217,7 +224,7 @@ QNetworkReply* MainWindow::apiCall(const QUrl &url)
 {
     QNetworkRequest request(url);
     request.setRawHeader("Authorization",
-        QString("Bearer %1").arg(oauth->token()).toUtf8());
+                         QString("Bearer %1").arg(oauth->token()).toUtf8());
     return networkManager->get(request);
 }
 
@@ -225,7 +232,7 @@ QNetworkReply* MainWindow::apiCall(const QUrl &url, QHttpMultiPart *multiPart)
 {
     QNetworkRequest request(url);
     request.setRawHeader("Authorization",
-        QString("Bearer %1").arg(oauth->token()).toUtf8());
+                         QString("Bearer %1").arg(oauth->token()).toUtf8());
     QNetworkReply *reply = networkManager->post(request, multiPart);
     multiPart->setParent(reply);
     return reply;
@@ -317,8 +324,8 @@ QWidget* MainWindow::createBlocking(){
 void MainWindow::deleteFile(const QString fileId)
 {
     auto result = QMessageBox::question(this, "Delete File",
-        "Are you sure you want to delete this file?",
-        QMessageBox::Yes | QMessageBox::No);
+                                        "Are you sure you want to delete this file?",
+                                        QMessageBox::Yes | QMessageBox::No);
 
     if (result != QMessageBox::Yes)
         return;
@@ -340,7 +347,7 @@ void MainWindow::deleteFile(const QString fileId)
         }
         else {
             QMessageBox::warning(this, "Error",
-                QString("Delete failed: %1").arg(reply->errorString()));
+                                 QString("Delete failed: %1").arg(reply->errorString()));
         }
 
         reply->deleteLater();
@@ -358,12 +365,54 @@ QNetworkReply* MainWindow::apiDelete(const QUrl url)
     return networkManager->deleteResource(request);
 }
 
+
+QByteArray MainWindow::encrypt(QString method, QByteArray toEncrypt){
+    QByteArray cipher;
+    QProcess process;
+    QStringList args;
+    if (method == "AES"){
+        args << "enc"
+             << "-aes-256-cbc"
+             << "-K" << aes_key.toHex()
+             << "-iv" << iv.toHex();
+        process.start("openssl", args);
+
+    }
+
+    else if (method == "ChaCha20"){
+        args << "enc"
+             << "-d"
+             << "chacha20"
+             << "-K" << aes_key.toHex()
+             << "-iv" << iv.toHex();
+    }
+
+    else{
+        qDebug() << "Where method?";
+    }
+    if (!process.waitForStarted()) {
+        qDebug() << "Failed to start OpenSSL";
+    }
+    process.write(toEncrypt);
+    process.closeWriteChannel();
+    if (!process.waitForFinished()) {
+        qDebug() << "OpenSSL failed";
+    }
+
+    cipher = process.readAllStandardOutput();
+    QByteArray errorOutput = process.readAllStandardError();
+    if (!errorOutput.isEmpty()) {
+        qDebug() << "OpenSSL error:" << errorOutput;
+    }
+    return cipher;
+}
+
 void MainWindow::decryptFileName(QString& name){
 
     QByteArray cipher = QByteArray::fromBase64(
         name.toLatin1(),
         QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals
-    );
+        );
 
     QProcess process;
     QStringList args;
@@ -448,18 +497,24 @@ void MainWindow::download(QString fileId, QString name){
 
         QString encryptionMethod = files[fileId];
 
-        if(encryptionMethod != "AES-256"){
-            qDebug() << encryptionMethod;
+        QStringList args;
+        if(encryptionMethod == "AES"){
+            args << "enc"
+                 << "-d"
+                 << "-aes-256-cbc"
+                 << "-K" << aes_key.toHex()
+                 << "-iv" << iv.toHex();
+
+            process.start("openssl", args);
         }
 
-        QStringList args;
-        args << "enc"
-             << "-d"
-             << "-aes-256-cbc"
-             << "-K" << aes_key.toHex()
-             << "-iv" << iv.toHex();
-
-        process.start("openssl", args);
+        else if(encryptionMethod == "ChaCha20"){
+            args << "enc"
+                 << "-d"
+                 << "chacha20"
+                 << "-K" << aes_key.toHex()
+                 << "-iv" << iv.toHex();
+        }
 
         if (!process.waitForStarted()) {
             qDebug() << "Failed to start OpenSSL";
@@ -558,6 +613,8 @@ void MainWindow::download(QString fileId, QString name){
 
 }
 
+
+
 static QString encryptedFileName(const QString &name)
 {
     if (!encryptFileNames)
@@ -639,31 +696,7 @@ void MainWindow::uploadFile(const QString &filePath)
         timer.start();
 
 
-    QProcess process;
-
-    QStringList args;
-    args << "enc"
-         << "-aes-256-cbc"
-         << "-K" << aes_key.toHex()
-         << "-iv" << iv.toHex();
-    process.start("openssl", args);
-
-    if (!process.waitForStarted()) {
-        qDebug() << "Failed to start OpenSSL";
-        return;
-    }
-    process.write(plainData);
-    process.closeWriteChannel();
-    if (!process.waitForFinished()) {
-        qDebug() << "OpenSSL failed";
-        return;
-    }
-
-    QByteArray cipher = process.readAllStandardOutput();
-    QByteArray errorOutput = process.readAllStandardError();
-    if (!errorOutput.isEmpty()) {
-        qDebug() << "OpenSSL error:" << errorOutput;
-    }
+    QByteArray cipher = encrypt(encryption_method, plainData);
 
     if(debug)
         qDebug() << "Encryption done in " << timer.elapsed() << "ms";
@@ -700,8 +733,8 @@ void MainWindow::uploadFile(const QString &filePath)
 
     // SEND
     QNetworkReply *reply = apiCall(
-                QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
-                multiPart);
+        QUrl("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"),
+        multiPart);
 
     QWidget* overlay = createBlocking();
     connect(reply, &QNetworkReply::finished, this, [this, reply, zipPath, overlay, timer]() {
@@ -718,7 +751,7 @@ void MainWindow::uploadFile(const QString &filePath)
             QJsonObject obj = doc.object();
             QString id = obj["id"].toString();
 
-            files[id] = "AES-256"; // test val
+            files[id] = encryption_method;      // set to current encryption method
 
             writeFilesToConfig();
 
@@ -741,7 +774,7 @@ void MainWindow::writeFilesToConfig(){
 
     QJsonObject root;
 
-     // Read existing config if it exists
+    // Read existing config if it exists
     if (configFile.open(QIODevice::ReadOnly)) {
         QJsonDocument doc = QJsonDocument::fromJson(configFile.readAll());
         root = doc.object();
@@ -750,13 +783,13 @@ void MainWindow::writeFilesToConfig(){
 
     qDebug() << files;
     QJsonObject filesObj;
-      for (auto it = files.begin(); it != files.end(); ++it) {
+    for (auto it = files.begin(); it != files.end(); ++it) {
         filesObj[it.key()] = it.value();
     }
 
-      root["files"] = filesObj;
+    root["files"] = filesObj;
     if (configFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-          configFile.write(QJsonDocument(root).toJson());
+        configFile.write(QJsonDocument(root).toJson());
         configFile.close();
     }
 
@@ -854,31 +887,8 @@ void MainWindow::uploadFolderAsZip(const QString &folderPath)
     if(debug)
         timer.start();
 
-    QProcess process;
+    QByteArray encrypted = encrypt(encryption_method, zipData);
 
-    QStringList args;
-    args << "enc"
-         << "-aes-256-cbc"
-         << "-K" << aes_key.toHex()
-         << "-iv" << iv.toHex();
-    process.start("openssl", args);
-
-    if (!process.waitForStarted()) {
-        qDebug() << "Failed to start OpenSSL";
-        return;
-    }
-    process.write(zipData);
-    process.closeWriteChannel();
-    if (!process.waitForFinished()) {
-        qDebug() << "OpenSSL failed";
-        return;
-    }
-
-    QByteArray encrypted = process.readAllStandardOutput();
-    QByteArray errorOutput = process.readAllStandardError();
-    if (!errorOutput.isEmpty()) {
-        qDebug() << "OpenSSL error:" << errorOutput;
-    }
     QFile out(encPath);
     if (!out.open(QIODevice::WriteOnly)) {
         qDebug() << "Cannot write encrypted file";

@@ -6,6 +6,7 @@
 #include <QNetworkReply>
 #include <QHttpMultiPart>
 #include <QLabel>
+#include <qstringview.h>
 #include "driveitem.h"
 
 class settings;
@@ -31,6 +32,10 @@ private:
     settings* settingsPage;
     void writeFilesToConfig();
     QMap<QString, QString> files;
+
+    QByteArray encrypt(QString method, QByteArray toEncrypt); 
+
+
     void decryptFileName(QString&);
     QWidget* createBlocking();
     Ui::MainWindow *ui;

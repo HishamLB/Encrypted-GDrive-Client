@@ -7,3 +7,5 @@ QByteArray iv;
 
 bool encryptFileNames;
 bool debug;
+
+QString encryption_method;
